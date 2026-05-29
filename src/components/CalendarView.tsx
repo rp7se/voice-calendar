@@ -4,11 +4,16 @@ import {
   formatDate,
   formatYearMonth,
   getMonthDays,
-  isSameDate,
   isToday,
 } from '../utils/date.ts'
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+
+type CalendarViewProps = {
+  selectedDate: string
+  onSelectDate: (date: Date) => void
+  eventsVersion?: number
+}
 
 function buildEventCountMap(): Record<string, number> {
   const counts: Record<string, number> = {}
@@ -18,11 +23,14 @@ function buildEventCountMap(): Record<string, number> {
   return counts
 }
 
-export default function CalendarView() {
+export default function CalendarView({
+  selectedDate,
+  onSelectDate,
+  eventsVersion = 0,
+}: CalendarViewProps) {
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
-  const [selectedDate, setSelectedDate] = useState(today)
 
   const monthDays = useMemo(
     () => getMonthDays(viewYear, viewMonth),
@@ -31,7 +39,7 @@ export default function CalendarView() {
 
   const eventCounts = useMemo(
     () => buildEventCountMap(),
-    [viewYear, viewMonth],
+    [viewYear, viewMonth, eventsVersion],
   )
 
   const goToPrevMonth = () => {
@@ -77,7 +85,7 @@ export default function CalendarView() {
           const dateKey = formatDate(day.date)
           const eventCount = eventCounts[dateKey] ?? 0
           const dayIsToday = isToday(day.date)
-          const dayIsSelected = isSameDate(day.date, selectedDate)
+          const dayIsSelected = dateKey === selectedDate
 
           return (
             <button
@@ -91,7 +99,7 @@ export default function CalendarView() {
               ]
                 .filter(Boolean)
                 .join(' ')}
-              onClick={() => setSelectedDate(day.date)}
+              onClick={() => onSelectDate(day.date)}
             >
               <span className="calendar-day-number">{day.day}</span>
               {eventCount > 0 && (
