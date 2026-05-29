@@ -77,7 +77,7 @@ export default function CountdownPanel() {
   return (
     <section className="countdown-panel" aria-label="倒计时">
       <header className="countdown-panel-header">
-        <h2>重要事项倒计时</h2>
+        <h2 className="section-title">⏳ 重要事项倒计时</h2>
         <p>记录考试、比赛、面试等重要日期</p>
       </header>
 
@@ -131,6 +131,9 @@ export default function CountdownPanel() {
                 className={`countdown-card countdown-card--${status}`}
               >
                 <div className="countdown-card-body">
+                  <span className="countdown-card-emoji" aria-hidden>
+                    {status === 'today' ? '🎯' : status === 'future' ? '⏳' : '📌'}
+                  </span>
                   <h4 className="countdown-card-title">{item.title}</h4>
                   <p className="countdown-card-date">{item.targetDate}</p>
                   {item.description && (

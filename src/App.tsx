@@ -26,30 +26,32 @@ function App() {
   return (
     <main className="app">
       <header className="app-header">
-        <h1>voice-calendar</h1>
+        <h1>VoiceCalendar</h1>
         <p className="intro-desc">面向学习、工作和竞赛场景的语音日程管理系统</p>
       </header>
 
-      <div className="app-main">
-        <div className="app-column">
+      <div className="main-layout">
+        <div className="left-main">
           <CalendarView
             selectedDate={selectedDate}
             onSelectDate={handleSelectDate}
             eventsVersion={eventsVersion}
           />
+          <CountdownPanel />
+        </div>
+
+        <aside className="right-sidebar">
           <CategoryPanel
             eventsVersion={eventsVersion}
             onCategoriesChange={handleCategoriesChange}
           />
-        </div>
-        <div className="app-side">
           <DayDetail
+            compact
             selectedDate={selectedDate}
             onEventsChange={handleEventsChange}
             categoriesVersion={categoriesVersion}
           />
-          <CountdownPanel />
-        </div>
+        </aside>
       </div>
     </main>
   )
