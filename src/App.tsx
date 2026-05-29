@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import CalendarView from './components/CalendarView.tsx'
+import CategoryPanel from './components/CategoryPanel.tsx'
 import CountdownPanel from './components/CountdownPanel.tsx'
 import DayDetail from './components/DayDetail.tsx'
 import { formatDate } from './utils/date.ts'
@@ -8,6 +9,7 @@ import './App.css'
 function App() {
   const [selectedDate, setSelectedDate] = useState(() => formatDate(new Date()))
   const [eventsVersion, setEventsVersion] = useState(0)
+  const [categoriesVersion, setCategoriesVersion] = useState(0)
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(formatDate(date))
@@ -15,6 +17,10 @@ function App() {
 
   const handleEventsChange = () => {
     setEventsVersion((version) => version + 1)
+  }
+
+  const handleCategoriesChange = () => {
+    setCategoriesVersion((version) => version + 1)
   }
 
   return (
@@ -25,13 +31,23 @@ function App() {
       </header>
 
       <div className="app-main">
-        <CalendarView
-          selectedDate={selectedDate}
-          onSelectDate={handleSelectDate}
-          eventsVersion={eventsVersion}
-        />
+        <div className="app-column">
+          <CalendarView
+            selectedDate={selectedDate}
+            onSelectDate={handleSelectDate}
+            eventsVersion={eventsVersion}
+          />
+          <CategoryPanel
+            eventsVersion={eventsVersion}
+            onCategoriesChange={handleCategoriesChange}
+          />
+        </div>
         <div className="app-side">
-          <DayDetail selectedDate={selectedDate} onEventsChange={handleEventsChange} />
+          <DayDetail
+            selectedDate={selectedDate}
+            onEventsChange={handleEventsChange}
+            categoriesVersion={categoriesVersion}
+          />
           <CountdownPanel />
         </div>
       </div>
