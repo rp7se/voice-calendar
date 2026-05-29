@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import CalendarView from './components/CalendarView.tsx'
 import CategoryPanel from './components/CategoryPanel.tsx'
+import CountdownBubbleLayer from './components/CountdownBubbleLayer.tsx'
 import CountdownPanel from './components/CountdownPanel.tsx'
 import DayDetail from './components/DayDetail.tsx'
 import { formatDate } from './utils/date.ts'
@@ -10,6 +11,7 @@ function App() {
   const [selectedDate, setSelectedDate] = useState(() => formatDate(new Date()))
   const [eventsVersion, setEventsVersion] = useState(0)
   const [categoriesVersion, setCategoriesVersion] = useState(0)
+  const [countdownVersion, setCountdownVersion] = useState(0)
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(formatDate(date))
@@ -23,8 +25,14 @@ function App() {
     setCategoriesVersion((version) => version + 1)
   }
 
+  const handleCountdownChange = () => {
+    setCountdownVersion((version) => version + 1)
+  }
+
   return (
     <main className="app">
+      <CountdownBubbleLayer refreshVersion={countdownVersion} />
+
       <header className="app-header">
         <h1>VoiceCalendar</h1>
         <p className="intro-desc">面向学习、工作和竞赛场景的语音日程管理系统</p>
@@ -37,7 +45,7 @@ function App() {
             onSelectDate={handleSelectDate}
             eventsVersion={eventsVersion}
           />
-          <CountdownPanel />
+          <CountdownPanel onCountdownChange={handleCountdownChange} />
         </div>
 
         <aside className="right-sidebar">

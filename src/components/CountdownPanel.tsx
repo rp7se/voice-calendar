@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { CountdownItem } from '../types/calendar.ts'
 import { addCountdown, deleteCountdown, getCountdowns } from '../utils/storage.ts'
-import { getDaysBetweenToday } from '../utils/date.ts'
+import { formatCountdownLabel, getDaysBetweenToday } from '../utils/date.ts'
 
 const EMPTY_FORM = {
   title: '',
@@ -9,18 +9,8 @@ const EMPTY_FORM = {
   description: '',
 }
 
-function getCountdownLabel(targetDate: string): string {
-  const days = getDaysBetweenToday(targetDate)
-  if (days === null) {
-    return '日期无效'
-  }
-  if (days === 0) {
-    return '就是今天'
-  }
-  if (days > 0) {
-    return `还有 ${days} 天`
-  }
-  return `已过去 ${Math.abs(days)} 天`
+type CountdownPanelProps = {
+  onCountdownChange?: () => void
 }
 
 function getCountdownStatus(targetDate: string): 'today' | 'future' | 'past' | 'invalid' {
@@ -37,7 +27,7 @@ function getCountdownStatus(targetDate: string): 'today' | 'future' | 'past' | '
   return 'past'
 }
 
-export default function CountdownPanel() {
+export default function CountdownPanel({ onCountdownChange }: CountdownPanelProps) {
   const [countdowns, setCountdowns] = useState<CountdownItem[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
 
@@ -67,11 +57,13 @@ export default function CountdownPanel() {
 
     setForm(EMPTY_FORM)
     refreshCountdowns()
+    onCountdownChange?.()
   }
 
   const handleDelete = (id: string) => {
     deleteCountdown(id)
     refreshCountdowns()
+    onCountdownChange?.()
   }
 
   return (
@@ -140,7 +132,7 @@ export default function CountdownPanel() {
                     <p className="countdown-card-desc">{item.description}</p>
                   )}
                   <p className="countdown-card-remaining">
-                    {getCountdownLabel(item.targetDate)}
+                    {formatCountdownLabel(item.targetDate)}
                   </p>
                 </div>
                 <button
