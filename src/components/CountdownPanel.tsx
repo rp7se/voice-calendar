@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import CompletionFeedbackModal from './CompletionFeedbackModal.tsx'
 import type { CountdownItem } from '../types/calendar.ts'
-import { addCountdown, deleteCountdown, getCountdowns } from '../utils/storage.ts'
+import { addCountdown, getCountdowns } from '../utils/storage.ts'
 import { formatCountdownLabel, getDaysBetweenToday } from '../utils/date.ts'
 
 const EMPTY_FORM = {
@@ -30,6 +31,7 @@ function getCountdownStatus(targetDate: string): 'today' | 'future' | 'past' | '
 export default function CountdownPanel({ onCountdownChange }: CountdownPanelProps) {
   const [countdowns, setCountdowns] = useState<CountdownItem[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
+  const [pendingDelete, setPendingDelete] = useState<CountdownItem | null>(null)
 
   const refreshCountdowns = () => {
     setCountdowns(getCountdowns())
@@ -60,14 +62,27 @@ export default function CountdownPanel({ onCountdownChange }: CountdownPanelProp
     onCountdownChange?.()
   }
 
-  const handleDelete = (id: string) => {
-    deleteCountdown(id)
+  const handleRequestDelete = (item: CountdownItem) => {
+    setPendingDelete(item)
+  }
+
+  const handleModalClose = () => {
+    setPendingDelete(null)
+  }
+
+  const handleModalDeleted = () => {
     refreshCountdowns()
     onCountdownChange?.()
   }
 
   return (
     <section className="countdown-panel" aria-label="倒计时">
+      <CompletionFeedbackModal
+        countdown={pendingDelete}
+        onClose={handleModalClose}
+        onDeleted={handleModalDeleted}
+      />
+
       <header className="countdown-panel-header">
         <h2 className="section-title">⏳ 重要事项倒计时</h2>
         <p>记录考试、比赛、面试等重要日期</p>
@@ -138,7 +153,7 @@ export default function CountdownPanel({ onCountdownChange }: CountdownPanelProp
                 <button
                   type="button"
                   className="countdown-delete-btn"
-                  onClick={() => handleDelete(item.id)}
+                  onClick={() => handleRequestDelete(item)}
                 >
                   删除
                 </button>

@@ -518,6 +518,126 @@
   color: #e57373;
 }
 
+/* --- 目标完成反馈弹窗 --- */
+
+.completion-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(26, 34, 51, 0.42);
+  backdrop-filter: blur(4px);
+}
+
+.completion-modal {
+  width: 100%;
+  max-width: 420px;
+  padding: 28px 28px 24px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 20px 50px rgba(80, 100, 180, 0.22);
+}
+
+.completion-modal-header h2 {
+  margin: 0 0 10px;
+  font-size: 1.35rem;
+  text-align: center;
+  color: var(--text-h);
+}
+
+.completion-modal-question {
+  margin: 0;
+  text-align: center;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.completion-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.completion-btn {
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    opacity 0.2s,
+    transform 0.15s,
+    box-shadow 0.2s;
+}
+
+.completion-btn:hover {
+  transform: translateY(-1px);
+}
+
+.completion-btn--done {
+  background: linear-gradient(135deg, #6b7cff 0%, #8b6cf0 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(107, 124, 255, 0.35);
+}
+
+.completion-btn--pending {
+  background: linear-gradient(135deg, #fff8e8 0%, #fff3e0 100%);
+  border-color: #ffcc80;
+  color: #e65100;
+}
+
+.completion-btn--cancel {
+  background: var(--surface-muted);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.completion-btn--wide {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.completion-modal-feedback {
+  text-align: center;
+}
+
+.completion-feedback-emoji {
+  margin: 0 0 8px;
+  font-size: 40px;
+  line-height: 1;
+}
+
+.completion-modal-feedback h2 {
+  margin: 0 0 10px;
+  font-size: 1.25rem;
+}
+
+.completion-feedback-message {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.completion-poem {
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  background: var(--accent-bg);
+  font-size: 15px;
+  font-style: italic;
+  line-height: 1.7;
+  color: var(--text-h);
+  text-align: left;
+}
+
 /* --- 分类侧边栏 --- */
 
 .category-panel {
