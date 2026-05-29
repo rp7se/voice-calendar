@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import CalendarView from './components/CalendarView.tsx'
+import CountdownPanel from './components/CountdownPanel.tsx'
 import DayDetail from './components/DayDetail.tsx'
 import { formatDate } from './utils/date.ts'
 import './App.css'
@@ -29,7 +30,10 @@ function App() {
           onSelectDate={handleSelectDate}
           eventsVersion={eventsVersion}
         />
-        <DayDetail selectedDate={selectedDate} onEventsChange={handleEventsChange} />
+        <div className="app-side">
+          <DayDetail selectedDate={selectedDate} onEventsChange={handleEventsChange} />
+          <CountdownPanel />
+        </div>
       </div>
     </main>
   )

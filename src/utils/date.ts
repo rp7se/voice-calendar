@@ -31,6 +31,53 @@ export function isToday(date: Date): boolean {
   return isSameDate(date, new Date())
 }
 
+function parseDateString(dateStr: string): Date | null {
+  const parts = dateStr.trim().split('-')
+  if (parts.length !== 3) {
+    return null
+  }
+
+  const year = Number(parts[0])
+  const month = Number(parts[1]) - 1
+  const day = Number(parts[2])
+
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+    return null
+  }
+
+  const date = new Date(year, month, day)
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month ||
+    date.getDate() !== day
+  ) {
+    return null
+  }
+
+  return date
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+/**
+ * 计算目标日期与今天相差的天数（归零时分秒）。
+ * 正数表示未来，负数表示已过去，0 表示今天。
+ */
+export function getDaysBetweenToday(targetDate: string): number | null {
+  const target = parseDateString(targetDate)
+  if (!target) {
+    return null
+  }
+
+  const today = startOfDay(new Date())
+  const targetDay = startOfDay(target)
+  const msPerDay = 24 * 60 * 60 * 1000
+
+  return Math.round((targetDay.getTime() - today.getTime()) / msPerDay)
+}
+
 /**
  * 返回月历网格所需日期（周日起始，7 列）。
  * @param year 年份

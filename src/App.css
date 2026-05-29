@@ -35,6 +35,12 @@
   align-items: start;
 }
 
+.app-side {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
 /* --- 月历 --- */
 
 .calendar-view {
@@ -186,6 +192,157 @@
   border-radius: 50%;
   background: var(--accent);
   flex-shrink: 0;
+}
+
+/* --- 倒计时 --- */
+
+.countdown-panel {
+  width: 100%;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--code-bg);
+  box-shadow: var(--shadow);
+}
+
+.countdown-panel-header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.countdown-panel-header h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.countdown-panel-header p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.countdown-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.countdown-form h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.countdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.countdown-empty {
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  color: var(--text);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.countdown-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.countdown-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+}
+
+.countdown-card--today {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: 0 4px 12px rgba(170, 59, 255, 0.12);
+}
+
+.countdown-card--future {
+  border-left: 4px solid var(--accent);
+}
+
+.countdown-card--past {
+  opacity: 0.75;
+  border-left: 4px solid var(--border);
+}
+
+.countdown-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.countdown-card-title {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-h);
+}
+
+.countdown-card-date {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.countdown-card-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.countdown-card-remaining {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.countdown-card--past .countdown-card-remaining {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.countdown-card--today .countdown-card-remaining {
+  color: var(--text-h);
+}
+
+.countdown-delete-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.countdown-delete-btn:hover {
+  border-color: #e57373;
+  color: #e57373;
 }
 
 /* --- 当日详情 --- */
