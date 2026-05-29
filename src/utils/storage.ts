@@ -104,6 +104,10 @@ export function getEventsByDate(date: string): CalendarEvent[] {
   return getEvents().filter((event) => event.date === date)
 }
 
+export function getEventsByCategory(categoryId: string): CalendarEvent[] {
+  return getEvents().filter((event) => event.categoryId === categoryId)
+}
+
 // --- 倒计时 ---
 
 export function getCountdowns(): CountdownItem[] {

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import type { CalendarEvent, EventType } from '../types/calendar.ts'
-import { addEvent, deleteEvent, getEventsByDate } from '../utils/storage.ts'
+import type { CalendarEvent, EventCategory, EventType } from '../types/calendar.ts'
+import { addEvent, deleteEvent, getCategories, getEventsByDate } from '../utils/storage.ts'
 
 type DayDetailProps = {
   selectedDate: string
   onEventsChange?: () => void
+  categoriesVersion?: number
 }
 
 const TYPE_GROUPS: { type: EventType; label: string }[] = [
@@ -27,6 +28,7 @@ const EMPTY_FORM = {
   startTime: '',
   endTime: '',
   type: 'schedule' as EventType,
+  categoryId: '',
   reminderEnabled: false,
 }
 
@@ -61,17 +63,23 @@ function formatDuration(minutes: number): string {
   return `${mins} 分钟`
 }
 
-export default function DayDetail({ selectedDate, onEventsChange }: DayDetailProps) {
+export default function DayDetail({
+  selectedDate,
+  onEventsChange,
+  categoriesVersion = 0,
+}: DayDetailProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [categories, setCategories] = useState<EventCategory[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
 
   const refreshEvents = () => {
     setEvents(getEventsByDate(selectedDate))
+    setCategories(getCategories())
   }
 
   useEffect(() => {
     refreshEvents()
-  }, [selectedDate])
+  }, [selectedDate, categoriesVersion])
 
   const groupedEvents = useMemo(() => {
     return TYPE_GROUPS.map((group) => ({
@@ -98,6 +106,7 @@ export default function DayDetail({ selectedDate, onEventsChange }: DayDetailPro
       startTime: form.startTime,
       endTime: form.endTime || undefined,
       type: form.type,
+      categoryId: form.categoryId || undefined,
       reminderEnabled: form.reminderEnabled,
     })
 
@@ -189,6 +198,29 @@ export default function DayDetail({ selectedDate, onEventsChange }: DayDetailPro
               </option>
             ))}
           </select>
+        </div>
+        <div className="form-row">
+          <label htmlFor="event-category">分类</label>
+          {categories.length === 0 ? (
+            <select id="event-category" disabled>
+              <option>暂无分类</option>
+            </select>
+          ) : (
+            <select
+              id="event-category"
+              value={form.categoryId}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, categoryId: e.target.value }))
+              }
+            >
+              <option value="">不选择分类</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <label className="form-checkbox">
           <input
