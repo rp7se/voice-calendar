@@ -109,12 +109,11 @@ export default function CategoryPanel({
   return (
     <section className="category-panel" aria-label="分类文件夹">
       <header className="category-panel-header">
-        <h2>分类文件夹</h2>
-        <p>按学习、比赛、面试等场景整理日程</p>
+        <h2 className="section-title">📁 分类</h2>
       </header>
 
       <form className="category-form" onSubmit={handleSubmit}>
-        <h3>新建分类</h3>
+        <h3 className="sidebar-form-title">新建</h3>
         <div className="form-row">
           <label htmlFor="category-name">名称 *</label>
           <input

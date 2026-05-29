@@ -6,6 +6,7 @@ type DayDetailProps = {
   selectedDate: string
   onEventsChange?: () => void
   categoriesVersion?: number
+  compact?: boolean
 }
 
 const TYPE_GROUPS: { type: EventType; label: string }[] = [
@@ -67,6 +68,7 @@ export default function DayDetail({
   selectedDate,
   onEventsChange,
   categoriesVersion = 0,
+  compact = false,
 }: DayDetailProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [categories, setCategories] = useState<EventCategory[]>([])
@@ -124,9 +126,12 @@ export default function DayDetail({
   const hasEvents = events.length > 0
 
   return (
-    <section className="day-detail" aria-label="当日详情">
+    <section
+      className={`day-detail${compact ? ' day-detail--compact' : ''}`}
+      aria-label="当日详情"
+    >
       <header className="day-detail-header">
-        <h2 className="day-detail-title">{selectedDate}</h2>
+        <h2 className="day-detail-title">📝 {selectedDate}</h2>
         <p className="day-detail-summary">
           共 {events.length} 项
           {totalDurationMinutes > 0 && (
@@ -136,7 +141,7 @@ export default function DayDetail({
       </header>
 
       <form className="day-detail-form" onSubmit={handleSubmit}>
-        <h3>添加事项</h3>
+        <h3 className="sidebar-form-title">添加事项</h3>
         <div className="form-row">
           <label htmlFor="event-title">标题 *</label>
           <input

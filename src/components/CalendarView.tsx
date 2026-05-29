@@ -63,6 +63,9 @@ export default function CalendarView({
 
   return (
     <section className="calendar-view" aria-label="月历">
+      <header className="section-header">
+        <h2 className="section-title">📅 日历</h2>
+      </header>
       <div className="calendar-toolbar">
         <button type="button" className="calendar-nav-btn" onClick={goToPrevMonth}>
           上个月
