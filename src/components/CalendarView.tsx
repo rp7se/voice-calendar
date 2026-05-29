@@ -6,6 +6,7 @@ import {
   getMonthDays,
   isToday,
 } from '../utils/date.ts'
+import { getHolidayByDate } from '../utils/holiday.ts'
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -84,6 +85,7 @@ export default function CalendarView({
         {monthDays.map((day) => {
           const dateKey = formatDate(day.date)
           const eventCount = eventCounts[dateKey] ?? 0
+          const holiday = getHolidayByDate(dateKey)
           const dayIsToday = isToday(day.date)
           const dayIsSelected = dateKey === selectedDate
 
@@ -102,6 +104,11 @@ export default function CalendarView({
               onClick={() => onSelectDate(day.date)}
             >
               <span className="calendar-day-number">{day.day}</span>
+              {holiday && (
+                <span className={`calendar-day-holiday calendar-day-holiday--${holiday.type}`}>
+                  {holiday.name}
+                </span>
+              )}
               {eventCount > 0 && (
                 <span className="calendar-day-events">
                   <span className="calendar-day-dot" aria-hidden />
