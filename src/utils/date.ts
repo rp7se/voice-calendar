@@ -78,6 +78,36 @@ export function getDaysBetweenToday(targetDate: string): number | null {
   return Math.round((targetDay.getTime() - today.getTime()) / msPerDay)
 }
 
+/** 倒计时剩余天数展示文案 */
+export function formatCountdownLabel(targetDate: string): string {
+  const days = getDaysBetweenToday(targetDate)
+  if (days === null) {
+    return '日期无效'
+  }
+  if (days === 0) {
+    return '就是今天'
+  }
+  if (days > 0) {
+    return `还有 ${days} 天`
+  }
+  return `已过去 ${Math.abs(days)} 天`
+}
+
+/** 倒计时语音播报文案 */
+export function formatCountdownSpeech(title: string, targetDate: string): string {
+  const days = getDaysBetweenToday(targetDate)
+  if (days === null) {
+    return `${title}的日期无效`
+  }
+  if (days === 0) {
+    return `${title}就是今天`
+  }
+  if (days > 0) {
+    return `距离${title}还有 ${days} 天`
+  }
+  return `${title}已经过去 ${Math.abs(days)} 天`
+}
+
 /**
  * 返回月历网格所需日期（周日起始，7 列）。
  * @param year 年份
