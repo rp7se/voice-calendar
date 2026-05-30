@@ -3,9 +3,12 @@ import { useSpeechRecognition } from '../hooks/useSpeechRecognition.ts'
 import type { ScheduleSummary } from '../utils/scheduleSummary.ts'
 import { getDaysBetweenToday } from '../utils/date.ts'
 import {
+  addDateToCategory,
   addEvent,
   deleteEvent,
+  getCategories,
   getCountdowns,
+  getDatesByCategory,
   getEventsByDate,
 } from '../utils/storage.ts'
 import { summarizeDay, summarizeNextSevenDays } from '../utils/scheduleSummary.ts'
@@ -13,6 +16,7 @@ import { parseVoiceCommand } from '../utils/voiceCommandParser.ts'
 
 type VoiceControlProps = {
   onCalendarChange?: () => void
+  onCategoryChange?: () => void
 }
 
 type ExecutionFeedback = {
@@ -75,7 +79,10 @@ function formatCountdownResult(title: string, targetDate: string): string {
   return `${title}已经过去 ${Math.abs(days)} 天。`
 }
 
-export default function VoiceControl({ onCalendarChange }: VoiceControlProps) {
+export default function VoiceControl({
+  onCalendarChange,
+  onCategoryChange,
+}: VoiceControlProps) {
   const {
     transcript,
     isListening,
@@ -94,6 +101,39 @@ export default function VoiceControl({ onCalendarChange }: VoiceControlProps) {
 
   const handleExecuteCommand = (text: string) => {
     const command = parseVoiceCommand(text)
+
+    if (
+      command.intent === 'category_date_add' &&
+      command.date &&
+      command.dateLabel &&
+      command.categoryName
+    ) {
+      const categories = getCategories()
+      const category = categories.find(
+        (item) =>
+          item.name === command.categoryName ||
+          item.name.includes(command.categoryName ?? '') ||
+          command.categoryName?.includes(item.name),
+      )
+
+      if (!category) {
+        const message = `没有找到${command.categoryName}分类，请先创建这个分类。`
+        setAndSpeak({ title: '分类未找到', message })
+        return
+      }
+
+      const alreadyLinked = getDatesByCategory(category.id).includes(command.date)
+      if (!alreadyLinked) {
+        addDateToCategory(category.id, command.date)
+        onCategoryChange?.()
+      }
+
+      const message = alreadyLinked
+        ? `${command.dateLabel}已经在${category.name}文件夹中了。`
+        : `已将${command.dateLabel}加入${category.name}文件夹。`
+      setAndSpeak({ title: alreadyLinked ? '已存在' : '加入成功', message })
+      return
+    }
 
     if (command.intent === 'summary_day' && command.date) {
       const summary = summarizeDay(command.date, command.dateLabel)
@@ -186,7 +226,7 @@ export default function VoiceControl({ onCalendarChange }: VoiceControlProps) {
 
     const message = command.reason
       ? `无法识别指令：${command.reason}`
-      : '暂时没有识别到可执行的语音指令。你可以说：总结5月8号的日程。'
+      : '暂时没有识别到可执行的语音指令。你可以说：把5月8日加入学习分类。'
     setAndSpeak({ title: '未识别指令', message })
   }
 

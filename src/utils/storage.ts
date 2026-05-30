@@ -3,6 +3,7 @@ import type {
   CalendarEventInput,
   CountdownItem,
   CountdownItemInput,
+  CategoryDateLink,
   EventCategory,
   EventCategoryInput,
 } from '../types/calendar.ts'
@@ -12,6 +13,7 @@ const STORAGE_KEYS = {
   EVENTS: 'voice-calendar:events',
   COUNTDOWNS: 'voice-calendar:countdowns',
   CATEGORIES: 'voice-calendar:categories',
+  CATEGORY_DATE_LINKS: 'voice-calendar:category-date-links',
 } as const
 
 function createId(): string {
@@ -169,5 +171,56 @@ export function deleteCategory(id: string): boolean {
     return false
   }
   saveCategories(nextCategories)
+  saveCategoryDateLinks(getCategoryDateLinks().filter((link) => link.categoryId !== id))
   return true
+}
+
+// --- 分类日期关联 ---
+
+export function getCategoryDateLinks(): CategoryDateLink[] {
+  return readFromStorage<CategoryDateLink[]>(STORAGE_KEYS.CATEGORY_DATE_LINKS, [])
+}
+
+export function saveCategoryDateLinks(links: CategoryDateLink[]): void {
+  writeToStorage(STORAGE_KEYS.CATEGORY_DATE_LINKS, links)
+}
+
+export function addDateToCategory(categoryId: string, date: string): CategoryDateLink {
+  const links = getCategoryDateLinks()
+  const existing = links.find(
+    (link) => link.categoryId === categoryId && link.date === date,
+  )
+
+  if (existing) {
+    return existing
+  }
+
+  const link: CategoryDateLink = {
+    id: createId(),
+    categoryId,
+    date,
+    createdAt: nowIso(),
+  }
+  links.push(link)
+  saveCategoryDateLinks(links)
+  return link
+}
+
+export function removeDateFromCategory(categoryId: string, date: string): boolean {
+  const links = getCategoryDateLinks()
+  const nextLinks = links.filter(
+    (link) => !(link.categoryId === categoryId && link.date === date),
+  )
+  if (nextLinks.length === links.length) {
+    return false
+  }
+  saveCategoryDateLinks(nextLinks)
+  return true
+}
+
+export function getDatesByCategory(categoryId: string): string[] {
+  return getCategoryDateLinks()
+    .filter((link) => link.categoryId === categoryId)
+    .map((link) => link.date)
+    .sort((a, b) => a.localeCompare(b))
 }
