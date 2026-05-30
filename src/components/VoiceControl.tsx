@@ -77,7 +77,10 @@ function stripWakeWord(text: string): { matched: boolean; commandText: string } 
   }
 
   const aliasIndex = compactText.indexOf(matchedAlias)
-  const commandText = compactText.slice(0, aliasIndex) + compactText.slice(aliasIndex + matchedAlias.length)
+  const commandText =
+    compactText.slice(0, aliasIndex) +
+    compactText.slice(aliasIndex + matchedAlias.length)
+
   return {
     matched: true,
     commandText: commandText.trim(),
@@ -140,8 +143,11 @@ export default function VoiceControl({
 
   const normalizeCommandText = (text: string): string | null => {
     const commandText = text.trim()
+
     if (!wakeWordEnabled) {
-      return commandText
+      const message = '请先开启唤醒模式，再使用语音助手执行日程指令。'
+      setAndSpeak({ title: '唤醒模式未开启', message })
+      return null
     }
 
     const wakeWordResult = stripWakeWord(commandText)
@@ -292,7 +298,7 @@ export default function VoiceControl({
 
     const message = command.reason
       ? `无法识别指令：${command.reason}`
-      : '暂时没有识别到可执行的语音指令。你可以说：明天9点提醒我考试。'
+      : '暂时没有识别到可执行的语音指令。你可以说：小历小历，明天9点提醒我考试。'
     setAndSpeak({ title: '未识别指令', message })
   }
 
@@ -342,10 +348,12 @@ export default function VoiceControl({
         </p>
       ) : (
         <>
-          <div className="wake-word-setting">
+          <div className={`wake-word-setting${wakeWordEnabled ? ' wake-word-setting--active' : ''}`}>
             <div className="wake-word-copy">
-              <strong>唤醒词模式</strong>
-              <span>开启后请先说：{WAKE_WORD}</span>
+              <strong>语音助手唤醒模式</strong>
+              <span>
+                开启后，只有先说“{WAKE_WORD}”才会执行日程指令；关闭时仅识别文字，不执行操作。
+              </span>
             </div>
             <button
               type="button"
