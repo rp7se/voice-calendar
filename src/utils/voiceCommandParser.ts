@@ -198,7 +198,12 @@ function chineseNumberToNumber(value: string): number | null {
   return digitMap[value] ?? null
 }
 
-function normalizeTime(hour: number, minute: number, period?: string): string | null {
+function normalizeTime(
+  hour: number,
+  minute: number,
+  period?: string,
+  inferAfternoon = false,
+): string | null {
   if (minute > 59) {
     return null
   }
@@ -213,6 +218,9 @@ function normalizeTime(hour: number, minute: number, period?: string): string | 
   if (period === '凌晨' && normalizedHour === 12) {
     normalizedHour = 0
   }
+  if (!period && inferAfternoon && normalizedHour >= 1 && normalizedHour <= 11) {
+    normalizedHour += 12
+  }
 
   if (normalizedHour < 0 || normalizedHour > 23) {
     return null
@@ -221,14 +229,117 @@ function normalizeTime(hour: number, minute: number, period?: string): string | 
   return `${String(normalizedHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
-function parseTime(text: string): { startTime: string; timeLabel: string; matchedText: string } | null {
+type ParsedTimePoint = {
+  hour: number
+  minute: number
+  period?: string
+}
+
+function buildTimeRange(
+  start: ParsedTimePoint,
+  end: ParsedTimePoint,
+  matchedText: string,
+): { startTime: string; endTime: string; timeLabel: string; matchedText: string } | null {
+  const explicitMorning =
+    start.period === '上午' ||
+    start.period === '早上' ||
+    start.period === '凌晨' ||
+    end.period === '上午' ||
+    end.period === '早上' ||
+    end.period === '凌晨'
+  const inferAfternoon =
+    !start.period && !end.period && !explicitMorning && start.hour >= 1 && start.hour <= 7
+  const inheritedEndPeriod = end.period ?? start.period
+  const startTime = normalizeTime(start.hour, start.minute, start.period, inferAfternoon)
+  const endTime = normalizeTime(end.hour, end.minute, inheritedEndPeriod, inferAfternoon)
+
+  if (!startTime || !endTime) {
+    return null
+  }
+
+  return {
+    startTime,
+    endTime,
+    timeLabel: `${startTime}-${endTime}`,
+    matchedText,
+  }
+}
+
+function parseTime(text: string): {
+  startTime: string
+  endTime?: string
+  timeLabel: string
+  matchedText: string
+} | null {
+  const clockRangeMatch = text.match(
+    /(上午|早上|中午|下午|晚上|今晚|凌晨)?([01]?\d|2[0-3])[:：]([0-5]\d)(?:到|至|-|—|~)(上午|早上|中午|下午|晚上|今晚|凌晨)?([01]?\d|2[0-3])[:：]([0-5]\d)/,
+  )
+  if (clockRangeMatch) {
+    const range = buildTimeRange(
+      {
+        period: clockRangeMatch[1],
+        hour: Number(clockRangeMatch[2]),
+        minute: Number(clockRangeMatch[3]),
+      },
+      {
+        period: clockRangeMatch[4],
+        hour: Number(clockRangeMatch[5]),
+        minute: Number(clockRangeMatch[6]),
+      },
+      clockRangeMatch[0],
+    )
+    if (range) {
+      return range
+    }
+  }
+
+  const hourText = '[零〇一二两三四五六七八九十\\d]{1,3}'
+  const textRangeMatch = text.match(
+    new RegExp(`(上午|早上|中午|下午|晚上|今晚|凌晨)?(${hourText})点(半|(${hourText})分?)?(?:到|至|-|—|~)(上午|早上|中午|下午|晚上|今晚|凌晨)?(${hourText})点(半|(${hourText})分?)?`),
+  )
+  if (textRangeMatch) {
+    const startHour = chineseNumberToNumber(textRangeMatch[2])
+    const startMinute =
+      textRangeMatch[3] === '半'
+        ? 30
+        : chineseNumberToNumber(textRangeMatch[4] ?? '0')
+    const endHour = chineseNumberToNumber(textRangeMatch[6])
+    const endMinute =
+      textRangeMatch[7] === '半'
+        ? 30
+        : chineseNumberToNumber(textRangeMatch[8] ?? '0')
+
+    if (
+      startHour !== null &&
+      startMinute !== null &&
+      endHour !== null &&
+      endMinute !== null
+    ) {
+      const range = buildTimeRange(
+        {
+          period: textRangeMatch[1],
+          hour: startHour,
+          minute: startMinute,
+        },
+        {
+          period: textRangeMatch[5],
+          hour: endHour,
+          minute: endMinute,
+        },
+        textRangeMatch[0],
+      )
+      if (range) {
+        return range
+      }
+    }
+  }
+
   const clockMatch = text.match(/([01]?\d|2[0-3])[:：]([0-5]\d)/)
   if (clockMatch) {
     const time = `${clockMatch[1].padStart(2, '0')}:${clockMatch[2]}`
     return { startTime: time, timeLabel: time, matchedText: clockMatch[0] }
   }
 
-  const hourText = '[零〇一二两三四五六七八九十\\d]{1,3}'
   const timeMatch = text.match(
     new RegExp(`(上午|早上|中午|下午|晚上|今晚|凌晨)?(${hourText})点(半|(${hourText})分?)?`),
   )
@@ -274,6 +385,8 @@ function cleanTitle(text: string, dateText?: string, timeText?: string): string 
     .replace(/\d{1,2}月\d{1,2}(?:日|号)/g, '')
     .replace(/(下周|下星期|下礼拜)[日天一二三四五六]|(?:周|星期|礼拜)[日天一二三四五六]/g, '')
     .replace(/今天|明天|后天/g, '')
+    .replace(/(上午|早上|中午|下午|晚上|今晚|凌晨)?([01]?\d|2[0-3])[:：]([0-5]\d)(?:到|至|-|—|~)(上午|早上|中午|下午|晚上|今晚|凌晨)?([01]?\d|2[0-3])[:：]([0-5]\d)/g, '')
+    .replace(/(上午|早上|中午|下午|晚上|今晚|凌晨)?[零〇一二两三四五六七八九十\d]{1,3}点(半|[零〇一二两三四五六七八九十\d]{1,3}分?)?(?:到|至|-|—|~)(上午|早上|中午|下午|晚上|今晚|凌晨)?[零〇一二两三四五六七八九十\d]{1,3}点(半|[零〇一二两三四五六七八九十\d]{1,3}分?)?/g, '')
     .replace(/([01]?\d|2[0-3])[:：]([0-5]\d)/g, '')
     .replace(/(上午|早上|中午|下午|晚上|今晚|凌晨)?[零〇一二两三四五六七八九十\d]{1,3}点(半|[零〇一二两三四五六七八九十\d]{1,3}分?)?/g, '')
     .replace(/帮我记|记录一下|记一下|提醒我|提醒|添加|新增|创建|安排|删除|取消/g, '')
@@ -425,6 +538,7 @@ export function parseVoiceCommand(input: string): ParsedVoiceCommand {
       dateLabel: resolvedDate.label,
       title,
       startTime,
+      endTime: parsedTime?.endTime,
       timeLabel: parsedTime?.timeLabel ?? startTime,
       eventType: inferEventType(text),
     }

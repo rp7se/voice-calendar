@@ -271,7 +271,10 @@ export default function VoiceControl({
       const dateText = command.dateLabel
         ? `${command.dateLabel}（${createdEvent.date}）`
         : createdEvent.date
-      const message = `已为你添加 ${dateText} ${createdEvent.startTime} 的${createdEvent.title}提醒${
+      const timeText = createdEvent.endTime
+        ? `${createdEvent.startTime}-${createdEvent.endTime}`
+        : createdEvent.startTime
+      const message = `已为你添加 ${dateText} ${timeText} 的${createdEvent.title}提醒${
         suggestion ? `。助手建议：${suggestion}` : '。'
       }`
       setAndSpeak({ title: '添加成功', message })
