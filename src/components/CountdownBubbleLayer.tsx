@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CountdownItem } from '../types/calendar.ts'
 import { getCountdowns } from '../utils/storage.ts'
 import { formatCountdownLabel, formatCountdownSpeech } from '../utils/date.ts'
@@ -25,7 +25,8 @@ const BUBBLE_SIZE = 104
 const BUBBLE_WIDTH = BUBBLE_SIZE
 const BUBBLE_HEIGHT = BUBBLE_SIZE
 const MIN_GAP = 16
-const SPEED = 0.42
+const SPEED = 0.28
+const MAX_SPEED = 0.5
 const OBSTACLE_PADDING = 18
 const AVOID_SELECTORS = [
   '.app-header',
@@ -110,11 +111,28 @@ function resolveObstacleCollision(bubble: BubblePhysics, rect: DOMRect, padding:
   }
 }
 
-function separateBubbles(bubbles: BubblePhysics[]): void {
+function clampVelocity(bubble: BubblePhysics): void {
+  const speed = Math.hypot(bubble.vx, bubble.vy)
+  if (speed <= MAX_SPEED || speed === 0) {
+    return
+  }
+
+  bubble.vx = (bubble.vx / speed) * MAX_SPEED
+  bubble.vy = (bubble.vy / speed) * MAX_SPEED
+}
+
+function separateBubbles(bubbles: BubblePhysics[], pausedBubbleId?: string): void {
   for (let i = 0; i < bubbles.length; i++) {
     for (let j = i + 1; j < bubbles.length; j++) {
       const a = bubbles[i]
       const b = bubbles[j]
+      const canMoveA = a.id !== pausedBubbleId
+      const canMoveB = b.id !== pausedBubbleId
+
+      if (!canMoveA && !canMoveB) {
+        continue
+      }
+
       const centerAX = a.x + a.width / 2
       const centerAY = a.y + a.height / 2
       const centerBX = b.x + b.width / 2
@@ -131,14 +149,21 @@ function separateBubbles(bubbles: BubblePhysics[]): void {
       const overlap = minDist - dist
       dx /= dist
       dy /= dist
-      a.x -= (dx * overlap) / 2
-      a.y -= (dy * overlap) / 2
-      b.x += (dx * overlap) / 2
-      b.y += (dy * overlap) / 2
-      a.vx -= dx * 0.02
-      a.vy -= dy * 0.02
-      b.vx += dx * 0.02
-      b.vy += dy * 0.02
+      const push = Math.min(overlap / (canMoveA && canMoveB ? 2 : 1), 0.6)
+
+      if (canMoveA) {
+        a.x -= dx * push
+        a.y -= dy * push
+        a.vx -= dx * 0.006
+        a.vy -= dy * 0.006
+      }
+
+      if (canMoveB) {
+        b.x += dx * push
+        b.y += dy * push
+        b.vx += dx * 0.006
+        b.vy += dy * 0.006
+      }
     }
   }
 }
@@ -213,6 +238,8 @@ export default function CountdownBubbleLayer({
 }: CountdownBubbleLayerProps) {
   const [bubbles, setBubbles] = useState<BubblePhysics[]>([])
   const [countdowns, setCountdowns] = useState<CountdownItem[]>([])
+  const [pausedBubbleId, setPausedBubbleId] = useState<string | null>(null)
+  const pausedBubbleIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     setCountdowns(getCountdowns())
@@ -245,8 +272,13 @@ export default function CountdownBubbleLayer({
 
       const maxX = window.innerWidth - BUBBLE_WIDTH
       const maxY = window.innerHeight - BUBBLE_HEIGHT
+      const currentPausedBubbleId = pausedBubbleIdRef.current
 
       for (const bubble of physics) {
+        if (bubble.id === currentPausedBubbleId) {
+          continue
+        }
+
         bubble.x += bubble.vx
         bubble.y += bubble.vy
 
@@ -269,9 +301,12 @@ export default function CountdownBubbleLayer({
         for (const rect of obstacles) {
           resolveObstacleCollision(bubble, rect, OBSTACLE_PADDING)
         }
+
+        clampVelocity(bubble)
       }
 
-      separateBubbles(physics)
+      separateBubbles(physics, currentPausedBubbleId ?? undefined)
+      physics.forEach(clampVelocity)
       setBubbles(physics.map((bubble) => ({ ...bubble })))
       animationId = window.requestAnimationFrame(tick)
     }
@@ -303,9 +338,17 @@ export default function CountdownBubbleLayer({
         <button
           key={bubble.id}
           type="button"
-          className="countdown-bubble"
+          className={`countdown-bubble${pausedBubbleId === bubble.id ? ' countdown-bubble--paused' : ''}`}
           style={{
             transform: `translate(${bubble.x}px, ${bubble.y}px)`,
+          }}
+          onMouseEnter={() => {
+            pausedBubbleIdRef.current = bubble.id
+            setPausedBubbleId(bubble.id)
+          }}
+          onMouseLeave={() => {
+            pausedBubbleIdRef.current = null
+            setPausedBubbleId(null)
           }}
           onClick={() => speakCountdown(bubble.title, bubble.targetDate)}
           title={`${bubble.title} · 点击语音播报`}
