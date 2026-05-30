@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type DragEvent } from 'react'
 import { getEvents } from '../utils/storage.ts'
 import {
   formatDate,
@@ -32,6 +32,7 @@ export default function CalendarView({
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
+  const [draggingDate, setDraggingDate] = useState<string | null>(null)
 
   const monthDays = useMemo(
     () => getMonthDays(viewYear, viewMonth),
@@ -61,10 +62,24 @@ export default function CalendarView({
     setViewMonth((month) => month + 1)
   }
 
+  const handleDragStart = (
+    event: DragEvent<HTMLButtonElement>,
+    dateKey: string,
+  ) => {
+    setDraggingDate(dateKey)
+    event.dataTransfer.effectAllowed = 'copy'
+    event.dataTransfer.setData('text/plain', dateKey)
+    event.dataTransfer.setData('application/x-voice-calendar-date', dateKey)
+  }
+
+  const handleDragEnd = () => {
+    setDraggingDate(null)
+  }
+
   return (
     <section className="calendar-view" aria-label="月历">
       <header className="section-header">
-        <h2 className="section-title">📅 日历</h2>
+        <h2 className="section-title">日历</h2>
       </header>
       <div className="calendar-toolbar">
         <button type="button" className="calendar-nav-btn" onClick={goToPrevMonth}>
@@ -96,15 +111,19 @@ export default function CalendarView({
             <button
               key={dateKey}
               type="button"
+              draggable={true}
               className={[
                 'calendar-day',
                 !day.isCurrentMonth && 'calendar-day--muted',
                 dayIsToday && 'calendar-day--today',
                 dayIsSelected && 'calendar-day--selected',
+                draggingDate === dateKey && 'calendar-day--dragging',
               ]
                 .filter(Boolean)
                 .join(' ')}
               onClick={() => onSelectDate(day.date)}
+              onDragStart={(event) => handleDragStart(event, dateKey)}
+              onDragEnd={handleDragEnd}
             >
               <span className="calendar-day-number">{day.day}</span>
               {holiday && (

@@ -9,6 +9,7 @@ export type VoiceCommandIntent =
   | 'summary_day'
   | 'summary_week'
   | 'countdown_query'
+  | 'category_date_add'
   | 'unknown'
 
 export type ParsedVoiceCommand = {
@@ -18,6 +19,7 @@ export type ParsedVoiceCommand = {
   dateLabel?: string
   title?: string
   titleKeyword?: string
+  categoryName?: string
   startTime?: string
   timeLabel?: string
   endTime?: string
@@ -90,7 +92,12 @@ function getUpcomingWeekday(targetWeekday: number, nextWeek: boolean): Date {
   return addDays(diff)
 }
 
-function resolveDate(text: string): { date: string; label: string; matchedText?: string; explicit: boolean } {
+function resolveDate(text: string): {
+  date: string
+  label: string
+  matchedText?: string
+  explicit: boolean
+} {
   const fullDateMatch = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})(?:日|号)?/)
   if (fullDateMatch) {
     const date = createDate(
@@ -299,6 +306,44 @@ function isSummaryDayCommand(text: string, hasExplicitDate: boolean): boolean {
   return false
 }
 
+function parseCategoryDateAdd(
+  text: string,
+  resolvedDate: ReturnType<typeof resolveDate>,
+): ParsedVoiceCommand | null {
+  if (!/(拖进|拖到|加入|放进|放到).*(文件夹|分类)/.test(text)) {
+    return null
+  }
+
+  if (!resolvedDate.explicit) {
+    return {
+      intent: 'unknown',
+      rawText: text,
+      reason: '没有识别到要加入分类的日期',
+    }
+  }
+
+  const match = text.match(/(?:拖进|拖到|加入|放进|放到)(.+?)(?:文件夹|分类|里面|中)?$/)
+  const categoryName = match?.[1]
+    ?.replace(/文件夹|分类|里面|中|里/g, '')
+    .trim()
+
+  if (!categoryName) {
+    return {
+      intent: 'unknown',
+      rawText: text,
+      reason: '没有识别到分类名称',
+    }
+  }
+
+  return {
+    intent: 'category_date_add',
+    rawText: text,
+    date: resolvedDate.date,
+    dateLabel: resolvedDate.label,
+    categoryName,
+  }
+}
+
 export function parseVoiceCommand(input: string): ParsedVoiceCommand {
   const rawText = input.trim()
   const text = rawText.replace(/\s+/g, '')
@@ -307,6 +352,14 @@ export function parseVoiceCommand(input: string): ParsedVoiceCommand {
 
   if (!text) {
     return { intent: 'unknown', rawText, reason: '没有识别到语音内容' }
+  }
+
+  const categoryDateCommand = parseCategoryDateAdd(text, resolvedDate)
+  if (categoryDateCommand) {
+    return {
+      ...categoryDateCommand,
+      rawText,
+    }
   }
 
   if (/距离.+(还有|还剩)(几|多少)天/.test(text)) {

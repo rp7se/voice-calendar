@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from 'react'
 import type { CalendarEvent, EventCategory, EventType } from '../types/calendar.ts'
 import {
   addCategory,
+  addDateToCategory,
   deleteCategory,
   getCategories,
+  getCategoryDateLinks,
+  getDatesByCategory,
   getEvents,
   getEventsByCategory,
+  getEventsByDate,
+  removeDateFromCategory,
 } from '../utils/storage.ts'
 
 type CategoryPanelProps = {
@@ -35,6 +40,35 @@ function buildCategoryCounts(): Record<string, number> {
   return counts
 }
 
+function buildCategoryDateCounts(): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const link of getCategoryDateLinks()) {
+    counts[link.categoryId] = (counts[link.categoryId] ?? 0) + 1
+  }
+  return counts
+}
+
+function getDraggedDate(event: DragEvent<HTMLElement>): string {
+  return (
+    event.dataTransfer.getData('application/x-voice-calendar-date') ||
+    event.dataTransfer.getData('text/plain')
+  )
+}
+
+function isValidDateKey(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function sortEventsByTime(events: CalendarEvent[]): CalendarEvent[] {
+  return [...events].sort((a, b) => {
+    const timeDiff = a.startTime.localeCompare(b.startTime)
+    if (timeDiff !== 0) {
+      return timeDiff
+    }
+    return a.title.localeCompare(b.title)
+  })
+}
+
 export default function CategoryPanel({
   eventsVersion = 0,
   onCategoriesChange,
@@ -42,7 +76,11 @@ export default function CategoryPanel({
   const [categories, setCategories] = useState<EventCategory[]>([])
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [categoryEvents, setCategoryEvents] = useState<CalendarEvent[]>([])
+  const [categoryDates, setCategoryDates] = useState<string[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
+  const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null)
+  const [dropFeedback, setDropFeedback] = useState('')
+  const [dateLinksVersion, setDateLinksVersion] = useState(0)
 
   const refreshCategories = () => {
     const list = getCategories()
@@ -50,26 +88,37 @@ export default function CategoryPanel({
     if (selectedCategoryId && !list.some((item) => item.id === selectedCategoryId)) {
       setSelectedCategoryId(null)
       setCategoryEvents([])
+      setCategoryDates([])
     }
   }
 
-  const refreshCategoryEvents = (categoryId: string | null) => {
+  const refreshCategoryDetails = (categoryId: string | null) => {
     if (!categoryId) {
       setCategoryEvents([])
+      setCategoryDates([])
       return
     }
     setCategoryEvents(getEventsByCategory(categoryId))
+    setCategoryDates(getDatesByCategory(categoryId))
   }
 
   useEffect(() => {
     refreshCategories()
-  }, [eventsVersion])
+  }, [eventsVersion, dateLinksVersion])
 
   useEffect(() => {
-    refreshCategoryEvents(selectedCategoryId)
-  }, [selectedCategoryId, eventsVersion])
+    refreshCategoryDetails(selectedCategoryId)
+  }, [selectedCategoryId, eventsVersion, dateLinksVersion])
 
-  const categoryCounts = useMemo(() => buildCategoryCounts(), [categories, eventsVersion])
+  const categoryCounts = useMemo(
+    () => buildCategoryCounts(),
+    [categories, eventsVersion],
+  )
+
+  const categoryDateCounts = useMemo(
+    () => buildCategoryDateCounts(),
+    [categories, dateLinksVersion],
+  )
 
   const selectedCategory = useMemo(
     () => categories.find((item) => item.id === selectedCategoryId) ?? null,
@@ -101,15 +150,53 @@ export default function CategoryPanel({
     if (selectedCategoryId === categoryId) {
       setSelectedCategoryId(null)
       setCategoryEvents([])
+      setCategoryDates([])
     }
     refreshCategories()
+    setDateLinksVersion((version) => version + 1)
+    onCategoriesChange?.()
+  }
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>, categoryId: string) => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setDragOverCategoryId(categoryId)
+  }
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>, category: EventCategory) => {
+    event.preventDefault()
+    setDragOverCategoryId(null)
+
+    const date = getDraggedDate(event)
+    if (!isValidDateKey(date)) {
+      return
+    }
+
+    const alreadyLinked = getDatesByCategory(category.id).includes(date)
+    addDateToCategory(category.id, date)
+    setSelectedCategoryId(category.id)
+    setDropFeedback(
+      alreadyLinked
+        ? `${date} 已经在 ${category.name} 文件夹中了`
+        : `已将 ${date} 加入 ${category.name}`,
+    )
+    setDateLinksVersion((version) => version + 1)
+    onCategoriesChange?.()
+  }
+
+  const handleRemoveDate = (date: string) => {
+    if (!selectedCategoryId) {
+      return
+    }
+    removeDateFromCategory(selectedCategoryId, date)
+    setDateLinksVersion((version) => version + 1)
     onCategoriesChange?.()
   }
 
   return (
     <section className="category-panel" aria-label="分类文件夹">
       <header className="category-panel-header">
-        <h2 className="section-title">📁 分类</h2>
+        <h2 className="section-title">分类</h2>
       </header>
 
       <form className="category-form" onSubmit={handleSubmit}>
@@ -120,7 +207,7 @@ export default function CategoryPanel({
             id="category-name"
             type="text"
             value={form.name}
-            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+            onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
             placeholder="例如：学习"
             required
           />
@@ -130,8 +217,8 @@ export default function CategoryPanel({
           <textarea
             id="category-desc"
             value={form.description}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, description: e.target.value }))
+            onChange={(event) =>
+              setForm((prev) => ({ ...prev, description: event.target.value }))
             }
             placeholder="可选描述"
             rows={2}
@@ -142,17 +229,31 @@ export default function CategoryPanel({
         </button>
       </form>
 
+      {dropFeedback && <p className="category-drop-feedback">{dropFeedback}</p>}
+
       <div className="category-folders">
         {categories.length === 0 ? (
-          <p className="category-empty">暂无分类，可在上方创建</p>
+          <p className="category-empty">暂无分类，可在上方创建。</p>
         ) : (
           categories.map((category) => {
             const count = categoryCounts[category.id] ?? 0
+            const dateCount = categoryDateCounts[category.id] ?? 0
             const isSelected = selectedCategoryId === category.id
+            const isDragOver = dragOverCategoryId === category.id
             return (
               <div
                 key={category.id}
-                className={`category-folder ${isSelected ? 'category-folder--selected' : ''}`}
+                className={[
+                  'category-folder',
+                  isSelected && 'category-folder--selected',
+                  isDragOver && 'category-folder--drag-over',
+                  isDragOver && 'category-card--drag-over',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                onDragOver={(event) => handleDragOver(event, category.id)}
+                onDragLeave={() => setDragOverCategoryId(null)}
+                onDrop={(event) => handleDrop(event, category)}
               >
                 <button
                   type="button"
@@ -162,11 +263,15 @@ export default function CategoryPanel({
                   <span className="category-folder-icon" aria-hidden>
                     📁
                   </span>
-                  <span className="category-folder-name">{category.name}</span>
-                  {category.description && (
-                    <span className="category-folder-desc">{category.description}</span>
-                  )}
-                  <span className="category-folder-count">{count} 项事项</span>
+                  <span className="category-folder-main">
+                    <span className="category-folder-name">{category.name}</span>
+                    {category.description && (
+                      <span className="category-folder-desc">{category.description}</span>
+                    )}
+                    <span className="category-folder-counts">
+                      {count} 项事项 · {dateCount} 个日期
+                    </span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -203,6 +308,35 @@ export default function CategoryPanel({
               ))}
             </ul>
           )}
+
+          <div className="category-linked-dates">
+            <h3 className="category-events-title">已加入的日期</h3>
+            {categoryDates.length === 0 ? (
+              <p className="category-events-empty">把日历日期拖到分类文件夹，即可加入这里。</p>
+            ) : (
+              <ul className="category-date-list">
+                {categoryDates.map((date) => {
+                  const dateEvents = sortEventsByTime(getEventsByDate(date))
+                  const previewTitles = dateEvents
+                    .slice(0, 3)
+                    .map((event) => event.title)
+                    .join('、')
+                  return (
+                    <li key={date} className="category-date-card">
+                      <div>
+                        <strong>{date}</strong>
+                        <span>{dateEvents.length} 项日程</span>
+                        <p>{previewTitles || '当天暂无日程'}</p>
+                      </div>
+                      <button type="button" onClick={() => handleRemoveDate(date)}>
+                        移除
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
         </div>
       )}
     </section>

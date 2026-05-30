@@ -41,7 +41,10 @@ function App() {
         <p className="intro-desc">面向学习、工作和竞赛场景的语音日程管理系统</p>
       </header>
 
-      <VoiceControl onCalendarChange={handleEventsChange} />
+      <VoiceControl
+        onCalendarChange={handleEventsChange}
+        onCategoryChange={handleCategoriesChange}
+      />
       <DayDetailModal
         selectedDate={selectedDate}
         isOpen={isDayDetailOpen}

@@ -29,6 +29,13 @@ export type EventCategory = {
   createdAt: string
 }
 
+export type CategoryDateLink = {
+  id: string
+  categoryId: string
+  date: string
+  createdAt: string
+}
+
 export type HolidayType = 'public' | 'traditional' | 'custom'
 
 export type HolidayInfo = {

@@ -846,6 +846,7 @@
   color: var(--text-h);
   text-align: left;
   cursor: pointer;
+  user-select: none;
   transition:
     border-color 0.2s,
     box-shadow 0.2s,
@@ -858,6 +859,21 @@
   background: #fff;
   box-shadow: var(--shadow-hover);
   transform: translateY(-2px);
+}
+
+.calendar-day[draggable='true'] {
+  cursor: grab;
+}
+
+.calendar-day[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.calendar-day--dragging {
+  opacity: 0.62;
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: 0 0 0 3px var(--accent-border);
 }
 
 .calendar-day--muted {
@@ -1297,6 +1313,16 @@
   box-shadow: 0 0 0 2px var(--accent-border);
 }
 
+.category-folder--drag-over,
+.category-card--drag-over {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, #fff 0%, var(--accent-bg) 100%);
+  box-shadow:
+    0 0 0 3px var(--accent-border),
+    var(--shadow-hover);
+  transform: translateY(-1px);
+}
+
 .category-folder-select {
   display: flex;
   flex: 1;
@@ -1309,6 +1335,14 @@
   color: var(--text-h);
   text-align: left;
   cursor: pointer;
+}
+
+.category-folder-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .category-folder-icon {
@@ -1325,14 +1359,31 @@
 }
 
 .category-folder-desc {
-  display: none;
+  display: block;
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.category-folder-count {
+.category-folder-count,
+.category-folder-counts {
   flex-shrink: 0;
   font-size: 11px;
   color: var(--accent-dark);
   font-weight: 500;
+}
+
+.category-drop-feedback {
+  margin: 0 0 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--accent-border);
+  border-radius: 9px;
+  background: var(--accent-bg);
+  color: var(--accent-dark);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .category-delete-btn {
@@ -1418,6 +1469,79 @@
   margin: 0;
   font-size: 11px;
   color: var(--text);
+}
+
+.category-linked-dates {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.category-date-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.category-date-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: linear-gradient(135deg, #fff 0%, #f7f9ff 100%);
+}
+
+.category-date-card div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.category-date-card strong {
+  color: var(--text-h);
+  font-size: 13px;
+}
+
+.category-date-card span {
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.category-date-card p {
+  margin: 0;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.category-date-card button {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.category-date-card button:hover {
+  border-color: #e57373;
+  color: #d94c4c;
 }
 
 /* --- 当日详情（侧边栏紧凑） --- */
