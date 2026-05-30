@@ -25,6 +25,25 @@ type ExecutionFeedback = {
   summary?: ScheduleSummary
 }
 
+const WAKE_WORD = '小历小历'
+
+const WAKE_WORD_ALIASES = [
+  '小历小历',
+  '小丽小丽',
+  '小李小李',
+  '小力小力',
+  '小利小利',
+  '小粒小粒',
+  '小璃小璃',
+  '小历',
+  '小丽',
+  '小李',
+  '小力',
+  '小利',
+  '小粒',
+  '小璃',
+]
+
 const ASSISTANT_SUGGESTIONS: Record<string, string> = {
   考试: '建议创建倒计时并安排复习。',
   比赛: '建议创建倒计时气泡。',
@@ -44,6 +63,25 @@ function speak(text: string) {
   utterance.rate = 1
   utterance.pitch = 1
   window.speechSynthesis.speak(utterance)
+}
+
+function stripWakeWord(text: string): { matched: boolean; commandText: string } {
+  const compactText = text.replace(/[\s，。,.！!？?、；;：:]/g, '')
+  const matchedAlias = WAKE_WORD_ALIASES.find((alias) => compactText.includes(alias))
+
+  if (!matchedAlias) {
+    return {
+      matched: false,
+      commandText: text,
+    }
+  }
+
+  const aliasIndex = compactText.indexOf(matchedAlias)
+  const commandText = compactText.slice(0, aliasIndex) + compactText.slice(aliasIndex + matchedAlias.length)
+  return {
+    matched: true,
+    commandText: commandText.trim(),
+  }
 }
 
 function getAssistantSuggestion(title: string): string | undefined {
@@ -92,6 +130,7 @@ export default function VoiceControl({
     stopListening,
   } = useSpeechRecognition()
   const [feedback, setFeedback] = useState<ExecutionFeedback | null>(null)
+  const [wakeWordEnabled, setWakeWordEnabled] = useState(false)
   const lastExecutedRef = useRef('')
 
   const setAndSpeak = (nextFeedback: ExecutionFeedback) => {
@@ -99,8 +138,35 @@ export default function VoiceControl({
     speak(nextFeedback.message)
   }
 
+  const normalizeCommandText = (text: string): string | null => {
+    const commandText = text.trim()
+    if (!wakeWordEnabled) {
+      return commandText
+    }
+
+    const wakeWordResult = stripWakeWord(commandText)
+    if (!wakeWordResult.matched) {
+      const message = `请先说出唤醒词：${WAKE_WORD}`
+      setAndSpeak({ title: '等待唤醒词', message })
+      return null
+    }
+
+    if (!wakeWordResult.commandText) {
+      const message = '已听到唤醒词，请继续说出具体指令。'
+      setAndSpeak({ title: '等待指令', message })
+      return null
+    }
+
+    return wakeWordResult.commandText
+  }
+
   const handleExecuteCommand = (text: string) => {
-    const command = parseVoiceCommand(text)
+    const commandText = normalizeCommandText(text)
+    if (commandText === null) {
+      return
+    }
+
+    const command = parseVoiceCommand(commandText)
 
     if (
       command.intent === 'category_date_add' &&
@@ -226,7 +292,7 @@ export default function VoiceControl({
 
     const message = command.reason
       ? `无法识别指令：${command.reason}`
-      : '暂时没有识别到可执行的语音指令。你可以说：把5月8日加入学习分类。'
+      : '暂时没有识别到可执行的语音指令。你可以说：明天9点提醒我考试。'
     setAndSpeak({ title: '未识别指令', message })
   }
 
@@ -261,7 +327,7 @@ export default function VoiceControl({
 
     lastExecutedRef.current = text
     handleExecuteCommand(text)
-  }, [isListening, transcript])
+  }, [isListening, transcript, wakeWordEnabled])
 
   return (
     <section className="voice-control" aria-label="语音输入">
@@ -276,6 +342,21 @@ export default function VoiceControl({
         </p>
       ) : (
         <>
+          <div className="wake-word-setting">
+            <div className="wake-word-copy">
+              <strong>唤醒词模式</strong>
+              <span>开启后请先说：{WAKE_WORD}</span>
+            </div>
+            <button
+              type="button"
+              className={`wake-word-toggle${wakeWordEnabled ? ' wake-word-toggle--active' : ''}`}
+              aria-pressed={wakeWordEnabled}
+              onClick={() => setWakeWordEnabled((enabled) => !enabled)}
+            >
+              {wakeWordEnabled ? '已开启' : '已关闭'}
+            </button>
+          </div>
+
           <div className="voice-actions">
             <button
               type="button"

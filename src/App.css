@@ -57,6 +57,71 @@
   color: var(--text);
 }
 
+.wake-word-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(107, 124, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.wake-word-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.wake-word-copy strong {
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.wake-word-copy span {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.wake-word-toggle {
+  flex-shrink: 0;
+  min-width: 86px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: 0 4px 12px rgba(107, 124, 255, 0.12);
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s,
+    border-color 0.2s,
+    background 0.2s,
+    color 0.2s;
+}
+
+.wake-word-toggle:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-hover);
+}
+
+.wake-word-toggle--active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #6b7cff 0%, #8b6cf0 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(107, 124, 255, 0.32);
+}
+
 .voice-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1787,6 +1852,15 @@
 
   .calendar-day-events {
     font-size: 10px;
+  }
+
+  .wake-word-setting {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wake-word-toggle {
+    width: 100%;
   }
 
   .day-detail-modal-overlay {
