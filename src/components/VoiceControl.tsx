@@ -186,7 +186,7 @@ export default function VoiceControl({ onCalendarChange }: VoiceControlProps) {
 
     const message = command.reason
       ? `无法识别指令：${command.reason}`
-      : '暂时没有识别到可执行的语音指令。你可以说：明天9点提醒我考试。'
+      : '暂时没有识别到可执行的语音指令。你可以说：总结5月8号的日程。'
     setAndSpeak({ title: '未识别指令', message })
   }
 
