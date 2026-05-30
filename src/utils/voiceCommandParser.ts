@@ -393,6 +393,7 @@ function cleanTitle(text: string, dateText?: string, timeText?: string): string 
     .replace(/有一场|有场|一场|有一个|有个|一个|有一次|有次|一次|有一件|有件|一件|需要|要/g, '')
     .replace(/日程|事项|事件|的|一下|我|请|帮我|给我/g, '')
     .replace(/[，。,.！!？?\s]/g, '')
+    .replace(/^(有一场|有一个|有一次|有一件|一场|一个|一次|一件|有场|有个|有次|有件|有)/, '')
     .trim()
 }
 
