@@ -39,14 +39,14 @@ function App() {
         <p className="intro-desc">面向学习、工作和竞赛场景的语音日程管理系统</p>
       </header>
 
-      <VoiceControl />
+      <VoiceControl onCalendarChange={handleEventsChange} />
 
       <div className="main-layout">
         <div className="left-main">
           <CalendarView
+            key={`calendar-${eventsVersion}`}
             selectedDate={selectedDate}
-            onSelectDate={handleSelectDate}
-            eventsVersion={eventsVersion}
+            onSelectDate={handleSelectDate}  
           />
           <CountdownPanel onCountdownChange={handleCountdownChange} />
         </div>
@@ -57,6 +57,7 @@ function App() {
             onCategoriesChange={handleCategoriesChange}
           />
           <DayDetail
+            key={`day-${eventsVersion}`}
             compact
             selectedDate={selectedDate}
             onEventsChange={handleEventsChange}
