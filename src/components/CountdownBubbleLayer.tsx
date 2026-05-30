@@ -15,25 +15,11 @@ type BubblePhysics = {
   y: number
   vx: number
   vy: number
-  width: number
-  height: number
 }
 
-type BubbleBounds = Pick<BubblePhysics, 'x' | 'y' | 'width' | 'height'>
-
 const BUBBLE_SIZE = 104
-const BUBBLE_WIDTH = BUBBLE_SIZE
-const BUBBLE_HEIGHT = BUBBLE_SIZE
 const MIN_GAP = 16
-const SPEED = 0.28
-const MAX_SPEED = 0.5
-const OBSTACLE_PADDING = 18
-const AVOID_SELECTORS = [
-  '.app-header',
-  '.calendar-view',
-  '.countdown-panel',
-  '.right-sidebar',
-]
+const SPEED = 0.22
 
 function speakCountdown(title: string, targetDate: string): void {
   try {
@@ -49,175 +35,22 @@ function speakCountdown(title: string, targetDate: string): void {
   }
 }
 
-function getObstacleRects(): DOMRect[] {
-  return AVOID_SELECTORS.flatMap((selector) => {
-    const element = document.querySelector(selector)
-    return element ? [element.getBoundingClientRect()] : []
-  })
-}
-
-function intersectsRect(a: BubbleBounds, rect: DOMRect, padding: number): boolean {
-  return (
-    a.x < rect.right + padding &&
-    a.x + a.width > rect.left - padding &&
-    a.y < rect.bottom + padding &&
-    a.y + a.height > rect.top - padding
-  )
-}
-
-function intersectsObstacles(bounds: BubbleBounds, obstacles: DOMRect[]): boolean {
-  return obstacles.some((rect) => intersectsRect(bounds, rect, OBSTACLE_PADDING))
-}
-
-function intersectsBubble(a: BubbleBounds, b: BubbleBounds): boolean {
-  return (
-    a.x < b.x + b.width + MIN_GAP &&
-    a.x + a.width + MIN_GAP > b.x &&
-    a.y < b.y + b.height + MIN_GAP &&
-    a.y + a.height + MIN_GAP > b.y
-  )
-}
-
-function resolveObstacleCollision(bubble: BubblePhysics, rect: DOMRect, padding: number): void {
-  const bRight = bubble.x + bubble.width
-  const bBottom = bubble.y + bubble.height
-  const oLeft = rect.left - padding
-  const oTop = rect.top - padding
-  const oRight = rect.right + padding
-  const oBottom = rect.bottom + padding
-
-  if (bRight <= oLeft || bubble.x >= oRight || bBottom <= oTop || bubble.y >= oBottom) {
-    return
-  }
-
-  const overlapLeft = bRight - oLeft
-  const overlapRight = oRight - bubble.x
-  const overlapTop = bBottom - oTop
-  const overlapBottom = oBottom - bubble.y
-  const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom)
-
-  if (minOverlap === overlapLeft) {
-    bubble.x = oLeft - bubble.width
-    bubble.vx = -Math.abs(bubble.vx)
-  } else if (minOverlap === overlapRight) {
-    bubble.x = oRight
-    bubble.vx = Math.abs(bubble.vx)
-  } else if (minOverlap === overlapTop) {
-    bubble.y = oTop - bubble.height
-    bubble.vy = -Math.abs(bubble.vy)
-  } else {
-    bubble.y = oBottom
-    bubble.vy = Math.abs(bubble.vy)
-  }
-}
-
-function clampVelocity(bubble: BubblePhysics): void {
-  const speed = Math.hypot(bubble.vx, bubble.vy)
-  if (speed <= MAX_SPEED || speed === 0) {
-    return
-  }
-
-  bubble.vx = (bubble.vx / speed) * MAX_SPEED
-  bubble.vy = (bubble.vy / speed) * MAX_SPEED
-}
-
-function separateBubbles(bubbles: BubblePhysics[], pausedBubbleId?: string): void {
-  for (let i = 0; i < bubbles.length; i++) {
-    for (let j = i + 1; j < bubbles.length; j++) {
-      const a = bubbles[i]
-      const b = bubbles[j]
-      const canMoveA = a.id !== pausedBubbleId
-      const canMoveB = b.id !== pausedBubbleId
-
-      if (!canMoveA && !canMoveB) {
-        continue
-      }
-
-      const centerAX = a.x + a.width / 2
-      const centerAY = a.y + a.height / 2
-      const centerBX = b.x + b.width / 2
-      const centerBY = b.y + b.height / 2
-      let dx = centerBX - centerAX
-      let dy = centerBY - centerAY
-      const dist = Math.hypot(dx, dy) || 1
-      const minDist = (a.width + b.width) / 2 + MIN_GAP
-
-      if (dist >= minDist) {
-        continue
-      }
-
-      const overlap = minDist - dist
-      dx /= dist
-      dy /= dist
-      const push = Math.min(overlap / (canMoveA && canMoveB ? 2 : 1), 0.6)
-
-      if (canMoveA) {
-        a.x -= dx * push
-        a.y -= dy * push
-        a.vx -= dx * 0.006
-        a.vy -= dy * 0.006
-      }
-
-      if (canMoveB) {
-        b.x += dx * push
-        b.y += dy * push
-        b.vx += dx * 0.006
-        b.vy += dy * 0.006
-      }
-    }
-  }
-}
-
-function findSafePosition(
-  existing: BubblePhysics[],
-  obstacles: DOMRect[],
-  viewportWidth: number,
-  viewportHeight: number,
-  seed: number,
-): { x: number; y: number } {
-  for (let attempt = 0; attempt < 60; attempt++) {
-    const x =
-      MIN_GAP + Math.random() * Math.max(MIN_GAP, viewportWidth - BUBBLE_WIDTH - MIN_GAP * 2)
-    const y =
-      MIN_GAP + Math.random() * Math.max(MIN_GAP, viewportHeight - BUBBLE_HEIGHT - MIN_GAP * 2)
-    const candidate: BubbleBounds = {
-      x,
-      y,
-      width: BUBBLE_WIDTH,
-      height: BUBBLE_HEIGHT,
-    }
-
-    if (intersectsObstacles(candidate, obstacles)) {
-      continue
-    }
-
-    if (existing.some((bubble) => intersectsBubble(candidate, bubble))) {
-      continue
-    }
-
-    return { x, y }
-  }
-
-  const edgeX = seed % 2 === 0 ? MIN_GAP : Math.max(MIN_GAP, viewportWidth - BUBBLE_WIDTH - MIN_GAP)
-  const edgeY = MIN_GAP + seed * (BUBBLE_HEIGHT + MIN_GAP)
-  return {
-    x: edgeX,
-    y: Math.min(edgeY, viewportHeight - BUBBLE_HEIGHT - MIN_GAP),
-  }
-}
-
 function createInitialBubbles(
   items: CountdownItem[],
-  obstacles: DOMRect[],
   viewportWidth: number,
   viewportHeight: number,
 ): BubblePhysics[] {
-  const bubbles: BubblePhysics[] = []
+  const maxX = Math.max(MIN_GAP, viewportWidth - BUBBLE_SIZE - MIN_GAP)
+  const maxY = Math.max(MIN_GAP, viewportHeight - BUBBLE_SIZE - MIN_GAP)
 
-  items.forEach((item, index) => {
-    const { x, y } = findSafePosition(bubbles, obstacles, viewportWidth, viewportHeight, index)
+  return items.map((item, index) => {
     const angle = (index * 1.7 + 0.5) % (Math.PI * 2)
-    bubbles.push({
+    const column = index % 4
+    const row = Math.floor(index / 4)
+    const x = Math.min(MIN_GAP + column * (BUBBLE_SIZE + 28), maxX)
+    const y = Math.min(MIN_GAP + row * (BUBBLE_SIZE + 28), maxY)
+
+    return {
       id: item.id,
       title: item.title,
       targetDate: item.targetDate,
@@ -225,12 +58,8 @@ function createInitialBubbles(
       y,
       vx: Math.cos(angle) * SPEED,
       vy: Math.sin(angle) * SPEED,
-      width: BUBBLE_WIDTH,
-      height: BUBBLE_HEIGHT,
-    })
+    }
   })
-
-  return bubbles
 }
 
 export default function CountdownBubbleLayer({
@@ -251,27 +80,13 @@ export default function CountdownBubbleLayer({
       return
     }
 
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-    let physics = createInitialBubbles(
-      countdowns,
-      getObstacleRects(),
-      viewportWidth,
-      viewportHeight,
-    )
+    let physics = createInitialBubbles(countdowns, window.innerWidth, window.innerHeight)
 
     let animationId = 0
-    let frameCount = 0
-    let obstacles = getObstacleRects()
 
     const tick = () => {
-      frameCount += 1
-      if (frameCount % 20 === 0) {
-        obstacles = getObstacleRects()
-      }
-
-      const maxX = window.innerWidth - BUBBLE_WIDTH
-      const maxY = window.innerHeight - BUBBLE_HEIGHT
+      const maxX = Math.max(MIN_GAP, window.innerWidth - BUBBLE_SIZE - MIN_GAP)
+      const maxY = Math.max(MIN_GAP, window.innerHeight - BUBBLE_SIZE - MIN_GAP)
       const currentPausedBubbleId = pausedBubbleIdRef.current
 
       for (const bubble of physics) {
@@ -279,34 +94,29 @@ export default function CountdownBubbleLayer({
           continue
         }
 
-        bubble.x += bubble.vx
-        bubble.y += bubble.vy
+        let nextX = bubble.x + bubble.vx
+        let nextY = bubble.y + bubble.vy
 
-        if (bubble.x <= MIN_GAP) {
-          bubble.x = MIN_GAP
+        if (nextX <= MIN_GAP) {
+          nextX = MIN_GAP
           bubble.vx = Math.abs(bubble.vx)
-        } else if (bubble.x >= maxX - MIN_GAP) {
-          bubble.x = maxX - MIN_GAP
+        } else if (nextX >= maxX) {
+          nextX = maxX
           bubble.vx = -Math.abs(bubble.vx)
         }
 
-        if (bubble.y <= MIN_GAP) {
-          bubble.y = MIN_GAP
+        if (nextY <= MIN_GAP) {
+          nextY = MIN_GAP
           bubble.vy = Math.abs(bubble.vy)
-        } else if (bubble.y >= maxY - MIN_GAP) {
-          bubble.y = maxY - MIN_GAP
+        } else if (nextY >= maxY) {
+          nextY = maxY
           bubble.vy = -Math.abs(bubble.vy)
         }
 
-        for (const rect of obstacles) {
-          resolveObstacleCollision(bubble, rect, OBSTACLE_PADDING)
-        }
-
-        clampVelocity(bubble)
+        bubble.x = nextX
+        bubble.y = nextY
       }
 
-      separateBubbles(physics, currentPausedBubbleId ?? undefined)
-      physics.forEach(clampVelocity)
       setBubbles(physics.map((bubble) => ({ ...bubble })))
       animationId = window.requestAnimationFrame(tick)
     }
@@ -315,16 +125,21 @@ export default function CountdownBubbleLayer({
     animationId = window.requestAnimationFrame(tick)
 
     const handleResize = () => {
-      obstacles = getObstacleRects()
+      const maxX = Math.max(MIN_GAP, window.innerWidth - BUBBLE_SIZE - MIN_GAP)
+      const maxY = Math.max(MIN_GAP, window.innerHeight - BUBBLE_SIZE - MIN_GAP)
+      physics = physics.map((bubble) => ({
+        ...bubble,
+        x: Math.min(Math.max(bubble.x, MIN_GAP), maxX),
+        y: Math.min(Math.max(bubble.y, MIN_GAP), maxY),
+      }))
+      setBubbles(physics.map((bubble) => ({ ...bubble })))
     }
 
     window.addEventListener('resize', handleResize)
-    window.addEventListener('scroll', handleResize, true)
 
     return () => {
       window.cancelAnimationFrame(animationId)
       window.removeEventListener('resize', handleResize)
-      window.removeEventListener('scroll', handleResize, true)
     }
   }, [countdowns])
 
@@ -340,7 +155,7 @@ export default function CountdownBubbleLayer({
           type="button"
           className={`countdown-bubble${pausedBubbleId === bubble.id ? ' countdown-bubble--paused' : ''}`}
           style={{
-            transform: `translate(${bubble.x}px, ${bubble.y}px)`,
+            transform: `translate3d(${bubble.x}px, ${bubble.y}px, 0)`,
           }}
           onMouseEnter={() => {
             pausedBubbleIdRef.current = bubble.id
