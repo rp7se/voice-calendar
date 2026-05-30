@@ -4,8 +4,7 @@ VoiceCalendar 是一个面向学习、工作和竞赛场景的语音日程管理
 
 ## Demo 视频
 
-> Demo 视频链接：待补充
-> 链接：https://pan.quark.cn/s/9c5fbdf2e802
+> Demo 视频链接：https://pan.quark.cn/s/9c5fbdf2e802
 
 建议 Demo 覆盖以下内容：
 
