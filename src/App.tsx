@@ -4,6 +4,7 @@ import CategoryPanel from './components/CategoryPanel.tsx'
 import CountdownBubbleLayer from './components/CountdownBubbleLayer.tsx'
 import CountdownPanel from './components/CountdownPanel.tsx'
 import DayDetail from './components/DayDetail.tsx'
+import VoiceControl from './components/VoiceControl.tsx'
 import { formatDate } from './utils/date.ts'
 import './App.css'
 
@@ -37,6 +38,8 @@ function App() {
         <h1>VoiceCalendar</h1>
         <p className="intro-desc">面向学习、工作和竞赛场景的语音日程管理系统</p>
       </header>
+
+      <VoiceControl />
 
       <div className="main-layout">
         <div className="left-main">
