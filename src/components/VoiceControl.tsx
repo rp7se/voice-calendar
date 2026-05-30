@@ -30,6 +30,7 @@ const WAKE_WORD = '小历小历'
 const WAKE_WORD_ALIASES = [
   '小历小历',
   '小丽小丽',
+  '小莉小莉',
   '小李小李',
   '小力小力',
   '小利小利',
@@ -37,6 +38,7 @@ const WAKE_WORD_ALIASES = [
   '小璃小璃',
   '小历',
   '小丽',
+  '小莉',
   '小李',
   '小力',
   '小利',
@@ -65,25 +67,37 @@ function speak(text: string) {
   window.speechSynthesis.speak(utterance)
 }
 
+function normalizeWakeText(text: string): string {
+  return text.replace(/[\s，。,.！!？?、；;：:、“”‘’"'（）()【】\[\]《》<>-]/g, '').trim()
+}
+
 function stripWakeWord(text: string): { matched: boolean; commandText: string } {
-  const compactText = text.replace(/[\s，。,.！!？?、；;：:]/g, '')
+  const compactText = normalizeWakeText(text)
   const matchedAlias = WAKE_WORD_ALIASES.find((alias) => compactText.includes(alias))
 
-  if (!matchedAlias) {
+  if (matchedAlias) {
+    const aliasIndex = compactText.indexOf(matchedAlias)
+    const commandText =
+      compactText.slice(0, aliasIndex) +
+      compactText.slice(aliasIndex + matchedAlias.length)
+
     return {
-      matched: false,
-      commandText: text,
+      matched: true,
+      commandText: commandText.trim(),
     }
   }
 
-  const aliasIndex = compactText.indexOf(matchedAlias)
-  const commandText =
-    compactText.slice(0, aliasIndex) +
-    compactText.slice(aliasIndex + matchedAlias.length)
+  const fuzzyMatch = compactText.match(/^小.{1}小.{1}/)
+  if (fuzzyMatch) {
+    return {
+      matched: true,
+      commandText: compactText.slice(fuzzyMatch[0].length).trim(),
+    }
+  }
 
   return {
-    matched: true,
-    commandText: commandText.trim(),
+    matched: false,
+    commandText: text,
   }
 }
 
@@ -158,7 +172,7 @@ export default function VoiceControl({
     }
 
     if (!wakeWordResult.commandText) {
-      const message = '已听到唤醒词，请继续说出具体指令。'
+      const message = '已唤醒，请继续说出日程指令。'
       setAndSpeak({ title: '等待指令', message })
       return null
     }
