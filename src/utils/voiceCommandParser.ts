@@ -90,7 +90,7 @@ function getUpcomingWeekday(targetWeekday: number, nextWeek: boolean): Date {
   return addDays(diff)
 }
 
-function resolveDate(text: string): { date: string; label: string; matchedText?: string } {
+function resolveDate(text: string): { date: string; label: string; matchedText?: string; explicit: boolean } {
   const fullDateMatch = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})(?:日|号)?/)
   if (fullDateMatch) {
     const date = createDate(
@@ -103,6 +103,7 @@ function resolveDate(text: string): { date: string; label: string; matchedText?:
         date: formatDate(date),
         label: formatMonthDayLabel(date),
         matchedText: fullDateMatch[0],
+        explicit: true,
       }
     }
   }
@@ -120,6 +121,7 @@ function resolveDate(text: string): { date: string; label: string; matchedText?:
         date: formatDate(date),
         label: formatMonthDayLabel(date),
         matchedText: monthDayMatch[0],
+        explicit: true,
       }
     }
   }
@@ -135,20 +137,21 @@ function resolveDate(text: string): { date: string; label: string; matchedText?:
       date: formatDate(date),
       label: `${nextWeek ? '下周' : '周'}${weekdayText}`,
       matchedText: weekdayMatch[0],
+      explicit: true,
     }
   }
 
   if (text.includes('后天')) {
-    return { date: formatDate(addDays(2)), label: '后天', matchedText: '后天' }
+    return { date: formatDate(addDays(2)), label: '后天', matchedText: '后天', explicit: true }
   }
   if (text.includes('明天')) {
-    return { date: formatDate(addDays(1)), label: '明天', matchedText: '明天' }
+    return { date: formatDate(addDays(1)), label: '明天', matchedText: '明天', explicit: true }
   }
   if (text.includes('今天')) {
-    return { date: formatDate(new Date()), label: '今天', matchedText: '今天' }
+    return { date: formatDate(new Date()), label: '今天', matchedText: '今天', explicit: true }
   }
 
-  return { date: formatDate(new Date()), label: '今天' }
+  return { date: formatDate(new Date()), label: '今天', explicit: false }
 }
 
 function chineseNumberToNumber(value: string): number | null {
@@ -286,6 +289,16 @@ function hasAddIntent(text: string): boolean {
   return ADD_WORDS.some((word) => text.includes(word))
 }
 
+function isSummaryDayCommand(text: string, hasExplicitDate: boolean): boolean {
+  if (/总结.*(今天|明天|后天|日程|安排|\d{1,2}月\d{1,2}(?:日|号)|\d{4}年\d{1,2}月\d{1,2})/.test(text)) {
+    return true
+  }
+  if (/(日程总结|安排总结|忙多久|总共要忙多久)/.test(text) && hasExplicitDate) {
+    return true
+  }
+  return false
+}
+
 export function parseVoiceCommand(input: string): ParsedVoiceCommand {
   const rawText = input.trim()
   const text = rawText.replace(/\s+/g, '')
@@ -308,10 +321,7 @@ export function parseVoiceCommand(input: string): ParsedVoiceCommand {
     return { intent: 'summary_week', rawText }
   }
 
-  if (
-    /总结.*(今天|明天|后天).*(日程|安排)/.test(text) ||
-    /我?(今天|明天|后天)?要忙多久/.test(text)
-  ) {
+  if (isSummaryDayCommand(text, resolvedDate.explicit)) {
     return {
       intent: 'summary_day',
       rawText,

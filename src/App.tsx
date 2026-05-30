@@ -3,7 +3,7 @@ import CalendarView from './components/CalendarView.tsx'
 import CategoryPanel from './components/CategoryPanel.tsx'
 import CountdownBubbleLayer from './components/CountdownBubbleLayer.tsx'
 import CountdownPanel from './components/CountdownPanel.tsx'
-import DayDetail from './components/DayDetail.tsx'
+import DayDetailModal from './components/DayDetailModal.tsx'
 import VoiceControl from './components/VoiceControl.tsx'
 import { formatDate } from './utils/date.ts'
 import './App.css'
@@ -13,9 +13,11 @@ function App() {
   const [eventsVersion, setEventsVersion] = useState(0)
   const [categoriesVersion, setCategoriesVersion] = useState(0)
   const [countdownVersion, setCountdownVersion] = useState(0)
+  const [isDayDetailOpen, setIsDayDetailOpen] = useState(false)
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(formatDate(date))
+    setIsDayDetailOpen(true)
   }
 
   const handleEventsChange = () => {
@@ -40,6 +42,13 @@ function App() {
       </header>
 
       <VoiceControl onCalendarChange={handleEventsChange} />
+      <DayDetailModal
+        selectedDate={selectedDate}
+        isOpen={isDayDetailOpen}
+        onClose={() => setIsDayDetailOpen(false)}
+        onEventsChange={handleEventsChange}
+        categoriesVersion={categoriesVersion}
+      />
 
       <div className="main-layout">
         <div className="left-main">
@@ -56,12 +65,13 @@ function App() {
             eventsVersion={eventsVersion}
             onCategoriesChange={handleCategoriesChange}
           />
-          <DayDetail
-            compact
-            selectedDate={selectedDate}
-            onEventsChange={handleEventsChange}
-            categoriesVersion={categoriesVersion}
-          />
+          <section className="day-detail-hint panel-card">
+            <h2 className="section-title">日期详情</h2>
+            <p>点击日历中的日期，查看和编辑当天事项。</p>
+            <button type="button" onClick={() => setIsDayDetailOpen(true)}>
+              打开 {selectedDate}
+            </button>
+          </section>
         </aside>
       </div>
     </main>

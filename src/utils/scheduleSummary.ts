@@ -113,16 +113,17 @@ function collectHighlights(events: CalendarEvent[]): ScheduleHighlight[] {
   return highlights
 }
 
-function buildSummary(title: string, dateRange: string, events: CalendarEvent[]): ScheduleSummary {
+function buildSummary(dateLabel: string, dateRange: string, events: CalendarEvent[]): ScheduleSummary {
   const sortedEvents = sortEvents(events)
   const eventCount = sortedEvents.length
   const totalDurationMinutes = calculateTotalDuration(sortedEvents)
   const totalDurationText = formatDuration(totalDurationMinutes)
   const mainItems = sortedEvents.slice(0, 6).map(formatEventItem)
   const highlights = collectHighlights(sortedEvents)
+  const title = `${dateLabel}的日程总结`
 
   if (eventCount === 0) {
-    const emptyMessage = `${title}暂无日程，可以轻松安排自己的时间。`
+    const emptyMessage = `${dateLabel}暂无日程，可以轻松安排自己的时间。`
     return {
       title,
       dateRange,
@@ -136,7 +137,7 @@ function buildSummary(title: string, dateRange: string, events: CalendarEvent[])
     }
   }
 
-  const itemText = mainItems.length > 0 ? `主要事项有：${mainItems.join('；')}。` : ''
+  const itemText = mainItems.length > 0 ? `主要安排：${mainItems.join('；')}。` : ''
   const highlightText =
     highlights.length > 0
       ? `重点提醒：${highlights.map((item) => `${item.title}，${item.message}`).join('；')}`
@@ -150,12 +151,12 @@ function buildSummary(title: string, dateRange: string, events: CalendarEvent[])
     totalDurationText,
     mainItems,
     highlights,
-    speechText: `${title}共有 ${eventCount} 项日程，预计总耗时${totalDurationText}。${itemText}${highlightText}`,
+    speechText: `${dateLabel}共有 ${eventCount} 项安排，预计总耗时${totalDurationText}。${itemText}${highlightText}`,
   }
 }
 
 export function summarizeDay(date: string, dateLabel = date): ScheduleSummary {
-  return buildSummary(`${dateLabel}的日程总结`, date, getEventsByDate(date))
+  return buildSummary(dateLabel, date, getEventsByDate(date))
 }
 
 export function summarizeNextSevenDays(): ScheduleSummary {
@@ -168,5 +169,5 @@ export function summarizeNextSevenDays(): ScheduleSummary {
   const dateSet = new Set(dates)
   const events = getEvents().filter((event) => dateSet.has(event.date))
 
-  return buildSummary('未来七天的安排总结', `${dates[0]} 至 ${dates[6]}`, events)
+  return buildSummary('未来七天', `${dates[0]} 至 ${dates[6]}`, events)
 }
