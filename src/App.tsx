@@ -44,9 +44,9 @@ function App() {
       <div className="main-layout">
         <div className="left-main">
           <CalendarView
-            key={`calendar-${eventsVersion}`}
             selectedDate={selectedDate}
-            onSelectDate={handleSelectDate}  
+            onSelectDate={handleSelectDate}
+            eventsVersion={eventsVersion}
           />
           <CountdownPanel onCountdownChange={handleCountdownChange} />
         </div>
@@ -57,7 +57,6 @@ function App() {
             onCategoriesChange={handleCategoriesChange}
           />
           <DayDetail
-            key={`day-${eventsVersion}`}
             compact
             selectedDate={selectedDate}
             onEventsChange={handleEventsChange}
