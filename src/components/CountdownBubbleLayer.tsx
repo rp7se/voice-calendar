@@ -5,6 +5,7 @@ import { formatCountdownLabel, formatCountdownSpeech } from '../utils/date.ts'
 
 type CountdownBubbleLayerProps = {
   refreshVersion?: number
+  disabled?: boolean
 }
 
 type BubblePhysics = {
@@ -15,11 +16,23 @@ type BubblePhysics = {
   y: number
   vx: number
   vy: number
+  zoneIndex: number
+}
+
+type SafeZone = {
+  x: number
+  y: number
+  width: number
+  height: number
 }
 
 const BUBBLE_SIZE = 104
 const MIN_GAP = 16
 const SPEED = 0.22
+const APP_MAX_WIDTH = 1320
+const PAGE_SIDE_PADDING = 28
+const MIN_SAFE_ZONE_WIDTH = BUBBLE_SIZE + 8
+const MIN_SAFE_ZONE_HEIGHT = BUBBLE_SIZE + 8
 
 function speakCountdown(title: string, targetDate: string): void {
   try {
@@ -35,20 +48,91 @@ function speakCountdown(title: string, targetDate: string): void {
   }
 }
 
+function createSafeZones(viewportWidth: number, viewportHeight: number): SafeZone[] {
+  if (viewportWidth < 900 || viewportHeight < 520) {
+    return []
+  }
+
+  const contentWidth = Math.min(APP_MAX_WIDTH, viewportWidth - PAGE_SIDE_PADDING * 2)
+  const contentLeft = (viewportWidth - contentWidth) / 2
+  const contentRight = contentLeft + contentWidth
+  const sideTop = 130
+  const sideHeight = viewportHeight - 260
+  const zones: SafeZone[] = [
+    {
+      x: 24,
+      y: sideTop,
+      width: contentLeft - 36,
+      height: sideHeight,
+    },
+    {
+      x: contentRight + 12,
+      y: sideTop,
+      width: viewportWidth - contentRight - 36,
+      height: sideHeight,
+    },
+  ]
+
+  const protectedSelectors = [
+    '.voice-control',
+    '.main-layout',
+    '.calendar-view',
+    '.countdown-panel',
+    '.right-sidebar',
+  ]
+  const protectedBottom = protectedSelectors.reduce((bottom, selector) => {
+    const element = document.querySelector(selector)
+    const rect = element?.getBoundingClientRect()
+    return rect ? Math.max(bottom, rect.bottom) : bottom
+  }, 0)
+  const bottomY = protectedBottom + 24
+  const bottomHeight = viewportHeight - bottomY - 24
+
+  if (bottomHeight >= MIN_SAFE_ZONE_HEIGHT) {
+    zones.push({
+      x: contentLeft + 24,
+      y: bottomY,
+      width: contentWidth - 48,
+      height: bottomHeight,
+    })
+  }
+
+  return zones.filter(
+    (zone) =>
+      zone.width >= MIN_SAFE_ZONE_WIDTH &&
+      zone.height >= MIN_SAFE_ZONE_HEIGHT &&
+      zone.x >= 0 &&
+      zone.y >= 0,
+  )
+}
+
+function clampToZone(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function getBubbleZone(bubble: BubblePhysics, zones: SafeZone[]): SafeZone | null {
+  return zones[bubble.zoneIndex] ?? zones[0] ?? null
+}
+
 function createInitialBubbles(
   items: CountdownItem[],
   viewportWidth: number,
   viewportHeight: number,
 ): BubblePhysics[] {
-  const maxX = Math.max(MIN_GAP, viewportWidth - BUBBLE_SIZE - MIN_GAP)
-  const maxY = Math.max(MIN_GAP, viewportHeight - BUBBLE_SIZE - MIN_GAP)
+  const safeZones = createSafeZones(viewportWidth, viewportHeight)
+  if (safeZones.length === 0) {
+    return []
+  }
 
   return items.map((item, index) => {
     const angle = (index * 1.7 + 0.5) % (Math.PI * 2)
-    const column = index % 4
-    const row = Math.floor(index / 4)
-    const x = Math.min(MIN_GAP + column * (BUBBLE_SIZE + 28), maxX)
-    const y = Math.min(MIN_GAP + row * (BUBBLE_SIZE + 28), maxY)
+    const zoneIndex = index % safeZones.length
+    const zone = safeZones[zoneIndex]
+    const maxX = zone.x + zone.width - BUBBLE_SIZE
+    const maxY = zone.y + zone.height - BUBBLE_SIZE
+    const offset = index * 37
+    const x = clampToZone(zone.x + MIN_GAP + (offset % Math.max(1, zone.width - BUBBLE_SIZE - MIN_GAP * 2)), zone.x, maxX)
+    const y = clampToZone(zone.y + MIN_GAP + ((offset * 1.6) % Math.max(1, zone.height - BUBBLE_SIZE - MIN_GAP * 2)), zone.y, maxY)
 
     return {
       id: item.id,
@@ -58,12 +142,14 @@ function createInitialBubbles(
       y,
       vx: Math.cos(angle) * SPEED,
       vy: Math.sin(angle) * SPEED,
+      zoneIndex,
     }
   })
 }
 
 export default function CountdownBubbleLayer({
   refreshVersion = 0,
+  disabled = false,
 }: CountdownBubbleLayerProps) {
   const [bubbles, setBubbles] = useState<BubblePhysics[]>([])
   const [countdowns, setCountdowns] = useState<CountdownItem[]>([])
@@ -75,7 +161,7 @@ export default function CountdownBubbleLayer({
   }, [refreshVersion])
 
   useEffect(() => {
-    if (countdowns.length === 0) {
+    if (disabled || countdowns.length === 0) {
       setBubbles([])
       return
     }
@@ -85,28 +171,43 @@ export default function CountdownBubbleLayer({
     let animationId = 0
 
     const tick = () => {
-      const maxX = Math.max(MIN_GAP, window.innerWidth - BUBBLE_SIZE - MIN_GAP)
-      const maxY = Math.max(MIN_GAP, window.innerHeight - BUBBLE_SIZE - MIN_GAP)
+      const safeZones = createSafeZones(window.innerWidth, window.innerHeight)
+      if (safeZones.length === 0) {
+        setBubbles([])
+        animationId = window.requestAnimationFrame(tick)
+        return
+      }
+
       const currentPausedBubbleId = pausedBubbleIdRef.current
 
       for (const bubble of physics) {
+        const zone = getBubbleZone(bubble, safeZones)
+        if (!zone) {
+          continue
+        }
+
+        const maxX = zone.x + zone.width - BUBBLE_SIZE
+        const maxY = zone.y + zone.height - BUBBLE_SIZE
+
         if (bubble.id === currentPausedBubbleId) {
+          bubble.x = clampToZone(bubble.x, zone.x, maxX)
+          bubble.y = clampToZone(bubble.y, zone.y, maxY)
           continue
         }
 
         let nextX = bubble.x + bubble.vx
         let nextY = bubble.y + bubble.vy
 
-        if (nextX <= MIN_GAP) {
-          nextX = MIN_GAP
+        if (nextX <= zone.x) {
+          nextX = zone.x
           bubble.vx = Math.abs(bubble.vx)
         } else if (nextX >= maxX) {
           nextX = maxX
           bubble.vx = -Math.abs(bubble.vx)
         }
 
-        if (nextY <= MIN_GAP) {
-          nextY = MIN_GAP
+        if (nextY <= zone.y) {
+          nextY = zone.y
           bubble.vy = Math.abs(bubble.vy)
         } else if (nextY >= maxY) {
           nextY = maxY
@@ -125,13 +226,23 @@ export default function CountdownBubbleLayer({
     animationId = window.requestAnimationFrame(tick)
 
     const handleResize = () => {
-      const maxX = Math.max(MIN_GAP, window.innerWidth - BUBBLE_SIZE - MIN_GAP)
-      const maxY = Math.max(MIN_GAP, window.innerHeight - BUBBLE_SIZE - MIN_GAP)
-      physics = physics.map((bubble) => ({
-        ...bubble,
-        x: Math.min(Math.max(bubble.x, MIN_GAP), maxX),
-        y: Math.min(Math.max(bubble.y, MIN_GAP), maxY),
-      }))
+      const safeZones = createSafeZones(window.innerWidth, window.innerHeight)
+      if (safeZones.length === 0) {
+        physics = []
+        setBubbles([])
+        return
+      }
+
+      physics = physics.map((bubble, index) => {
+        const nextZoneIndex = bubble.zoneIndex < safeZones.length ? bubble.zoneIndex : index % safeZones.length
+        const zone = safeZones[nextZoneIndex]
+        return {
+          ...bubble,
+          zoneIndex: nextZoneIndex,
+          x: clampToZone(bubble.x, zone.x, zone.x + zone.width - BUBBLE_SIZE),
+          y: clampToZone(bubble.y, zone.y, zone.y + zone.height - BUBBLE_SIZE),
+        }
+      })
       setBubbles(physics.map((bubble) => ({ ...bubble })))
     }
 
@@ -141,9 +252,9 @@ export default function CountdownBubbleLayer({
       window.cancelAnimationFrame(animationId)
       window.removeEventListener('resize', handleResize)
     }
-  }, [countdowns])
+  }, [countdowns, disabled])
 
-  if (countdowns.length === 0) {
+  if (disabled || countdowns.length === 0 || bubbles.length === 0) {
     return null
   }
 

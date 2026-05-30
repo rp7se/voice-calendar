@@ -380,7 +380,7 @@
 .countdown-bubble-layer {
   position: fixed;
   inset: 0;
-  z-index: 5;
+  z-index: 4;
   overflow: hidden;
   pointer-events: none;
 }

@@ -39,7 +39,10 @@ function App() {
 
   return (
     <main className="app">
-      <CountdownBubbleLayer refreshVersion={countdownVersion} />
+      <CountdownBubbleLayer
+        refreshVersion={countdownVersion}
+        disabled={isDayDetailOpen}
+      />
 
       <header className="app-header">
         <h1>VoiceCalendar</h1>
