@@ -17,10 +17,12 @@ export type ParsedVoiceCommand = {
   date?: string
   dateLabel?: string
   title?: string
+  titleKeyword?: string
   startTime?: string
   timeLabel?: string
   endTime?: string
   eventType?: EventType
+  reason?: string
 }
 
 const ADD_WORDS = [
@@ -71,11 +73,18 @@ function formatMonthDayLabel(date: Date): string {
 function getUpcomingWeekday(targetWeekday: number, nextWeek: boolean): Date {
   const today = new Date()
   const currentWeekday = today.getDay()
-  let diff = targetWeekday - currentWeekday
+
   if (nextWeek) {
-    diff += diff <= 0 ? 7 : 0
-    diff += 7
-  } else if (diff < 0) {
+    const daysUntilNextMonday = ((1 - currentWeekday + 7) % 7) || 7
+    const mondayOfNextWeek = addDays(daysUntilNextMonday)
+    const offset = targetWeekday === 0 ? 6 : targetWeekday - 1
+    const date = new Date(mondayOfNextWeek)
+    date.setDate(mondayOfNextWeek.getDate() + offset)
+    return date
+  }
+
+  let diff = targetWeekday - currentWeekday
+  if (diff < 0) {
     diff += 7
   }
   return addDays(diff)
@@ -100,8 +109,12 @@ function resolveDate(text: string): { date: string; label: string; matchedText?:
 
   const monthDayMatch = text.match(/(\d{1,2})月(\d{1,2})(?:日|号)/)
   if (monthDayMatch) {
-    const year = new Date().getFullYear()
-    const date = createDate(year, Number(monthDayMatch[1]), Number(monthDayMatch[2]))
+    const today = new Date()
+    const date = createDate(
+      today.getFullYear(),
+      Number(monthDayMatch[1]),
+      Number(monthDayMatch[2]),
+    )
     if (date) {
       return {
         date: formatDate(date),
@@ -125,11 +138,11 @@ function resolveDate(text: string): { date: string; label: string; matchedText?:
     }
   }
 
-  if (text.includes('明天')) {
-    return { date: formatDate(addDays(1)), label: '明天', matchedText: '明天' }
-  }
   if (text.includes('后天')) {
     return { date: formatDate(addDays(2)), label: '后天', matchedText: '后天' }
+  }
+  if (text.includes('明天')) {
+    return { date: formatDate(addDays(1)), label: '明天', matchedText: '明天' }
   }
   if (text.includes('今天')) {
     return { date: formatDate(new Date()), label: '今天', matchedText: '今天' }
@@ -145,6 +158,7 @@ function chineseNumberToNumber(value: string): number | null {
 
   const digitMap: Record<string, number> = {
     零: 0,
+    〇: 0,
     一: 1,
     二: 2,
     两: 2,
@@ -180,10 +194,8 @@ function normalizeTime(hour: number, minute: number, period?: string): string | 
   }
 
   let normalizedHour = hour
-  if (period === '下午' || period === '晚上') {
-    if (normalizedHour < 12) {
-      normalizedHour += 12
-    }
+  if ((period === '下午' || period === '晚上' || period === '今晚') && normalizedHour < 12) {
+    normalizedHour += 12
   }
   if (period === '中午' && normalizedHour < 11) {
     normalizedHour += 12
@@ -206,9 +218,9 @@ function parseTime(text: string): { startTime: string; timeLabel: string; matche
     return { startTime: time, timeLabel: time, matchedText: clockMatch[0] }
   }
 
-  const hourText = '[零一二两三四五六七八九十\\d]{1,3}'
+  const hourText = '[零〇一二两三四五六七八九十\\d]{1,3}'
   const timeMatch = text.match(
-    new RegExp(`(上午|早上|中午|下午|晚上|凌晨)?(${hourText})点(半|(${hourText})分?)?`),
+    new RegExp(`(上午|早上|中午|下午|晚上|今晚|凌晨)?(${hourText})点(半|(${hourText})分?)?`),
   )
   if (!timeMatch) {
     return null
@@ -247,19 +259,17 @@ function cleanTitle(text: string, dateText?: string, timeText?: string): string 
     title = title.replace(timeText, '')
   }
 
-  title = title
+  return title
     .replace(/(\d{4})年(\d{1,2})月(\d{1,2})(?:日|号)?/g, '')
     .replace(/\d{1,2}月\d{1,2}(?:日|号)/g, '')
     .replace(/(下周|下星期|下礼拜)[日天一二三四五六]|(?:周|星期|礼拜)[日天一二三四五六]/g, '')
     .replace(/今天|明天|后天/g, '')
     .replace(/([01]?\d|2[0-3])[:：]([0-5]\d)/g, '')
-    .replace(/(上午|早上|中午|下午|晚上|凌晨)?[零一二两三四五六七八九十\d]{1,3}点(半|[零一二两三四五六七八九十\d]{1,3}分?)?/g, '')
+    .replace(/(上午|早上|中午|下午|晚上|今晚|凌晨)?[零〇一二两三四五六七八九十\d]{1,3}点(半|[零〇一二两三四五六七八九十\d]{1,3}分?)?/g, '')
     .replace(/帮我记|记录一下|记一下|提醒我|提醒|添加|新增|创建|安排|删除|取消/g, '')
-    .replace(/的|一下|我|请|帮我/g, '')
-    .replace(/[，。,.！!？?]/g, '')
+    .replace(/日程|事项|事件|的|一下|我|请|帮我/g, '')
+    .replace(/[，。,.！!？?\s]/g, '')
     .trim()
-
-  return title
 }
 
 function parseCountdownTitle(text: string): string {
@@ -283,7 +293,7 @@ export function parseVoiceCommand(input: string): ParsedVoiceCommand {
   const parsedTime = parseTime(text)
 
   if (!text) {
-    return { intent: 'unknown', rawText }
+    return { intent: 'unknown', rawText, reason: '没有识别到语音内容' }
   }
 
   if (/距离.+(还有|还剩)(几|多少)天/.test(text)) {
@@ -300,7 +310,7 @@ export function parseVoiceCommand(input: string): ParsedVoiceCommand {
 
   if (
     /总结.*(今天|明天|后天).*(日程|安排)/.test(text) ||
-    /(今天|明天|后天).*要忙多久/.test(text)
+    /我?(今天|明天|后天)?要忙多久/.test(text)
   ) {
     return {
       intent: 'summary_day',
@@ -310,23 +320,25 @@ export function parseVoiceCommand(input: string): ParsedVoiceCommand {
     }
   }
 
-  if (/(现在)?几点|当前时间|现在时间/.test(text)) {
+  if (/(现在)?几点|几点了|当前时间|现在时间|播报时间/.test(text)) {
     return { intent: 'time', rawText }
   }
 
-  if (/(删除|取消).*(日程|安排|事项|提醒|考试|面试|比赛|会议|生日|纪念日)?/.test(text)) {
+  if (/(删除|取消)/.test(text)) {
+    const title = cleanTitle(text, resolvedDate.matchedText, parsedTime?.matchedText)
     return {
       intent: 'delete',
       rawText,
       date: resolvedDate.date,
       dateLabel: resolvedDate.label,
-      title: cleanTitle(text, resolvedDate.matchedText, parsedTime?.matchedText),
+      title,
+      titleKeyword: title || undefined,
       startTime: parsedTime?.startTime,
       timeLabel: parsedTime?.timeLabel,
     }
   }
 
-  if (/(查询|查看|看看).*(今天|明天|后天|周|星期|礼拜|\d{1,2}月\d{1,2}).*(日程|安排|事项)/.test(text)) {
+  if (/(查询|查看|看看|有什么安排|有什么日程|安排是什么|日程是什么)/.test(text)) {
     return {
       intent: 'query',
       rawText,
@@ -337,17 +349,23 @@ export function parseVoiceCommand(input: string): ParsedVoiceCommand {
 
   if (hasAddIntent(text)) {
     const startTime = parsedTime?.startTime ?? '09:00'
+    const title = cleanTitle(text, resolvedDate.matchedText, parsedTime?.matchedText)
+
+    if (!title) {
+      return { intent: 'unknown', rawText, reason: '没有识别到日程标题' }
+    }
+
     return {
       intent: 'add',
       rawText,
       date: resolvedDate.date,
       dateLabel: resolvedDate.label,
-      title: cleanTitle(text, resolvedDate.matchedText, parsedTime?.matchedText) || '语音日程',
+      title,
       startTime,
       timeLabel: parsedTime?.timeLabel ?? startTime,
       eventType: inferEventType(text),
     }
   }
 
-  return { intent: 'unknown', rawText }
+  return { intent: 'unknown', rawText, reason: '暂时无法识别这条语音指令' }
 }

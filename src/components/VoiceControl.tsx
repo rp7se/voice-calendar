@@ -13,8 +13,6 @@ import { parseVoiceCommand } from '../utils/voiceCommandParser.ts'
 
 type VoiceControlProps = {
   onCalendarChange?: () => void
-  onEventsChange?: () => void
-  onCountdownChange?: () => void
 }
 
 type ExecutionFeedback = {
@@ -39,6 +37,8 @@ function speak(text: string) {
   window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'zh-CN'
+  utterance.rate = 1
+  utterance.pitch = 1
   window.speechSynthesis.speak(utterance)
 }
 
@@ -75,11 +75,7 @@ function formatCountdownResult(title: string, targetDate: string): string {
   return `${title}已经过去 ${Math.abs(days)} 天。`
 }
 
-export default function VoiceControl({
-  onCalendarChange,
-  onEventsChange,
-  onCountdownChange,
-}: VoiceControlProps) {
+export default function VoiceControl({ onCalendarChange }: VoiceControlProps) {
   const {
     transcript,
     isListening,
@@ -91,12 +87,9 @@ export default function VoiceControl({
   const [feedback, setFeedback] = useState<ExecutionFeedback | null>(null)
   const lastExecutedRef = useRef('')
 
-  const notifyCalendarChange = () => {
-    if (onCalendarChange) {
-      onCalendarChange()
-      return
-    }
-    onEventsChange?.()
+  const setAndSpeak = (nextFeedback: ExecutionFeedback) => {
+    setFeedback(nextFeedback)
+    speak(nextFeedback.message)
   }
 
   const handleExecuteCommand = (text: string) => {
@@ -104,23 +97,21 @@ export default function VoiceControl({
 
     if (command.intent === 'summary_day' && command.date) {
       const summary = summarizeDay(command.date, command.dateLabel)
-      setFeedback({
+      setAndSpeak({
         title: summary.title,
         message: summary.speechText,
         summary,
       })
-      speak(summary.speechText)
       return
     }
 
     if (command.intent === 'summary_week') {
       const summary = summarizeNextSevenDays()
-      setFeedback({
+      setAndSpeak({
         title: summary.title,
         message: summary.speechText,
         summary,
       })
-      speak(summary.speechText)
       return
     }
 
@@ -132,9 +123,7 @@ export default function VoiceControl({
       const message = countdown
         ? formatCountdownResult(countdown.title, countdown.targetDate)
         : `没有找到和“${queryTitle || '这个事项'}”匹配的倒计时。`
-      setFeedback({ title: '倒计时查询', message })
-      speak(message)
-      onCountdownChange?.()
+      setAndSpeak({ title: '倒计时查询', message })
       return
     }
 
@@ -144,7 +133,9 @@ export default function VoiceControl({
         description: `由语音指令创建：${command.rawText}`,
         date: command.date,
         startTime: command.startTime,
+        endTime: command.endTime,
         type: command.eventType ?? 'schedule',
+        categoryId: undefined,
         reminderEnabled: true,
       })
 
@@ -152,24 +143,23 @@ export default function VoiceControl({
       const message = `已为你添加${command.dateLabel ?? command.date}${command.timeLabel ?? command.startTime}的${command.title}提醒${
         suggestion ? `。助手建议：${suggestion}` : '。'
       }`
-      setFeedback({ title: '添加成功', message })
-      speak(message)
-      notifyCalendarChange()
+      setAndSpeak({ title: '添加成功', message })
+      onCalendarChange?.()
       return
     }
 
     if (command.intent === 'query' && command.date) {
       const events = getEventsByDate(command.date)
       const message = formatEventsForSpeech(command.dateLabel ?? command.date, events)
-      setFeedback({ title: '日程查询', message })
-      speak(message)
+      setAndSpeak({ title: '日程查询', message })
       return
     }
 
     if (command.intent === 'delete' && command.date) {
       const events = getEventsByDate(command.date)
+      const titleKeyword = command.titleKeyword ?? command.title
       const matchedEvent = events.find((event) => {
-        const titleMatched = command.title ? event.title.includes(command.title) : true
+        const titleMatched = titleKeyword ? event.title.includes(titleKeyword) : true
         const timeMatched = command.startTime ? event.startTime === command.startTime : true
         return titleMatched && timeMatched
       })
@@ -178,33 +168,33 @@ export default function VoiceControl({
         deleted && matchedEvent
           ? `已删除${command.dateLabel ?? command.date}${matchedEvent.startTime}的${matchedEvent.title}。`
           : `没有找到可删除的${command.dateLabel ?? command.date}日程。`
-      setFeedback({ title: deleted ? '删除成功' : '删除失败', message })
-      speak(message)
+      setAndSpeak({ title: deleted ? '删除成功' : '删除失败', message })
       if (deleted) {
-        notifyCalendarChange()
+        onCalendarChange?.()
       }
       return
     }
 
     if (command.intent === 'time') {
       const now = new Date()
-      const message = `现在是 ${now.getHours()} 点 ${now.getMinutes()} 分。`
-      setFeedback({ title: '当前时间', message })
-      speak(message)
+      const hour = String(now.getHours()).padStart(2, '0')
+      const minute = String(now.getMinutes()).padStart(2, '0')
+      const message = `现在是 ${hour}:${minute}。`
+      setAndSpeak({ title: '当前时间', message })
       return
     }
 
-    const message = '暂时没有识别到可执行的语音指令。你可以说：明天9点提醒我考试。'
-    setFeedback({ title: '未识别指令', message })
-    speak(message)
+    const message = command.reason
+      ? `无法识别指令：${command.reason}`
+      : '暂时没有识别到可执行的语音指令。你可以说：明天9点提醒我考试。'
+    setAndSpeak({ title: '未识别指令', message })
   }
 
   const executeTranscript = () => {
     const text = transcript.trim()
     if (!text) {
       const message = '请先说出或输入一条语音指令。'
-      setFeedback({ title: '等待指令', message })
-      speak(message)
+      setAndSpeak({ title: '等待指令', message })
       return
     }
 
@@ -212,11 +202,12 @@ export default function VoiceControl({
     handleExecuteCommand(text)
   }
 
-  const handleToggle = () => {
+  const handleToggleListening = () => {
     if (isListening) {
       stopListening()
       return
     }
+
     setFeedback(null)
     lastExecutedRef.current = ''
     startListening()
@@ -249,7 +240,7 @@ export default function VoiceControl({
             <button
               type="button"
               className={`voice-button voice-control-btn${isListening ? ' voice-button--listening voice-control-btn--listening' : ''}`}
-              onClick={handleToggle}
+              onClick={handleToggleListening}
             >
               {isListening ? '正在听... 点击停止' : '开始语音输入'}
             </button>
@@ -263,16 +254,16 @@ export default function VoiceControl({
             </button>
           </div>
 
-          {error && <p className="voice-control-error">{error}</p>}
+          {error && <p className="voice-control-error voice-error">{error}</p>}
 
-          <div className="voice-control-result">
+          <div className="voice-control-result voice-result">
             <span className="voice-control-result-label">识别结果</span>
             <p className="voice-control-transcript">
               {transcript || (isListening ? '请开始说话...' : '暂无识别内容')}
             </p>
           </div>
 
-          <div className="voice-control-feedback" aria-live="polite">
+          <div className="voice-control-feedback voice-command-result" aria-live="polite">
             <span className="voice-control-result-label">执行反馈</span>
             {feedback ? (
               <article className="voice-feedback-card">

@@ -39,10 +39,7 @@ function App() {
         <p className="intro-desc">面向学习、工作和竞赛场景的语音日程管理系统</p>
       </header>
 
-      <VoiceControl
-        onCalendarChange={handleEventsChange}
-        onCountdownChange={handleCountdownChange}
-      />
+      <VoiceControl onCalendarChange={handleEventsChange} />
 
       <div className="main-layout">
         <div className="left-main">
