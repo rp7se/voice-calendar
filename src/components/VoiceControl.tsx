@@ -17,6 +17,7 @@ import { parseVoiceCommand } from '../utils/voiceCommandParser.ts'
 type VoiceControlProps = {
   onCalendarChange?: () => void
   onCategoryChange?: () => void
+  onSelectDate?: (date: string) => void
 }
 
 type ExecutionFeedback = {
@@ -137,6 +138,7 @@ function formatCountdownResult(title: string, targetDate: string): string {
 export default function VoiceControl({
   onCalendarChange,
   onCategoryChange,
+  onSelectDate,
 }: VoiceControlProps) {
   const {
     transcript,
@@ -254,7 +256,7 @@ export default function VoiceControl({
     }
 
     if (command.intent === 'add' && command.date && command.title && command.startTime) {
-      addEvent({
+      const createdEvent = addEvent({
         title: command.title,
         description: `由语音指令创建：${command.rawText}`,
         date: command.date,
@@ -266,11 +268,15 @@ export default function VoiceControl({
       })
 
       const suggestion = getAssistantSuggestion(command.title)
-      const message = `已为你添加${command.dateLabel ?? command.date}${command.timeLabel ?? command.startTime}的${command.title}提醒${
+      const dateText = command.dateLabel
+        ? `${command.dateLabel}（${createdEvent.date}）`
+        : createdEvent.date
+      const message = `已为你添加 ${dateText} ${createdEvent.startTime} 的${createdEvent.title}提醒${
         suggestion ? `。助手建议：${suggestion}` : '。'
       }`
       setAndSpeak({ title: '添加成功', message })
       onCalendarChange?.()
+      onSelectDate?.(createdEvent.date)
       return
     }
 

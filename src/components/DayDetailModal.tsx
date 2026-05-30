@@ -8,6 +8,7 @@ type DayDetailModalProps = {
   isOpen: boolean
   onClose: () => void
   onEventsChange?: () => void
+  eventsVersion?: number
   categoriesVersion?: number
 }
 
@@ -50,6 +51,7 @@ export default function DayDetailModal({
   isOpen,
   onClose,
   onEventsChange,
+  eventsVersion = 0,
   categoriesVersion = 0,
 }: DayDetailModalProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -66,7 +68,7 @@ export default function DayDetailModal({
       return
     }
     refreshEvents()
-  }, [isOpen, selectedDate, categoriesVersion])
+  }, [isOpen, selectedDate, eventsVersion, categoriesVersion])
 
   const sortedEvents = useMemo(() => sortEventsByTime(events), [events])
 

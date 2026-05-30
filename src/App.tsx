@@ -20,6 +20,11 @@ function App() {
     setIsDayDetailOpen(true)
   }
 
+  const handleVoiceSelectDate = (date: string) => {
+    setSelectedDate(date)
+    setIsDayDetailOpen(true)
+  }
+
   const handleEventsChange = () => {
     setEventsVersion((version) => version + 1)
   }
@@ -44,12 +49,14 @@ function App() {
       <VoiceControl
         onCalendarChange={handleEventsChange}
         onCategoryChange={handleCategoriesChange}
+        onSelectDate={handleVoiceSelectDate}
       />
       <DayDetailModal
         selectedDate={selectedDate}
         isOpen={isDayDetailOpen}
         onClose={() => setIsDayDetailOpen(false)}
         onEventsChange={handleEventsChange}
+        eventsVersion={eventsVersion}
         categoriesVersion={categoriesVersion}
       />
 
