@@ -1,6 +1,85 @@
+import { useEffect, useRef, useState } from 'react'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition.ts'
+import type { ScheduleSummary } from '../utils/scheduleSummary.ts'
+import { getDaysBetweenToday } from '../utils/date.ts'
+import {
+  addEvent,
+  deleteEvent,
+  getCountdowns,
+  getEventsByDate,
+} from '../utils/storage.ts'
+import { summarizeDay, summarizeNextSevenDays } from '../utils/scheduleSummary.ts'
+import { parseVoiceCommand } from '../utils/voiceCommandParser.ts'
 
-export default function VoiceControl() {
+type VoiceControlProps = {
+  onCalendarChange?: () => void
+  onEventsChange?: () => void
+  onCountdownChange?: () => void
+}
+
+type ExecutionFeedback = {
+  title: string
+  message: string
+  summary?: ScheduleSummary
+}
+
+const ASSISTANT_SUGGESTIONS: Record<string, string> = {
+  考试: '建议创建倒计时并安排复习。',
+  比赛: '建议创建倒计时气泡。',
+  面试: '建议提前准备简历和自我介绍。',
+  纪念日: '建议提前三天提醒准备礼物。',
+  生日: '建议提前准备祝福或礼物。',
+}
+
+function speak(text: string) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    return
+  }
+
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'zh-CN'
+  window.speechSynthesis.speak(utterance)
+}
+
+function getAssistantSuggestion(title: string): string | undefined {
+  const keyword = Object.keys(ASSISTANT_SUGGESTIONS).find((item) =>
+    title.includes(item),
+  )
+  return keyword ? ASSISTANT_SUGGESTIONS[keyword] : undefined
+}
+
+function formatEventsForSpeech(dateLabel: string, events: ReturnType<typeof getEventsByDate>) {
+  if (events.length === 0) {
+    return `${dateLabel}暂无日程。`
+  }
+
+  const items = events
+    .slice(0, 6)
+    .map((event) => `${event.startTime} ${event.title}`)
+    .join('；')
+  return `${dateLabel}共有 ${events.length} 项日程：${items}。`
+}
+
+function formatCountdownResult(title: string, targetDate: string): string {
+  const days = getDaysBetweenToday(targetDate)
+  if (days === null) {
+    return `${title}的日期无效。`
+  }
+  if (days === 0) {
+    return `${title}就是今天。`
+  }
+  if (days > 0) {
+    return `距离${title}还有 ${days} 天。`
+  }
+  return `${title}已经过去 ${Math.abs(days)} 天。`
+}
+
+export default function VoiceControl({
+  onCalendarChange,
+  onEventsChange,
+  onCountdownChange,
+}: VoiceControlProps) {
   const {
     transcript,
     isListening,
@@ -9,20 +88,155 @@ export default function VoiceControl() {
     startListening,
     stopListening,
   } = useSpeechRecognition()
+  const [feedback, setFeedback] = useState<ExecutionFeedback | null>(null)
+  const lastExecutedRef = useRef('')
+
+  const notifyCalendarChange = () => {
+    if (onCalendarChange) {
+      onCalendarChange()
+      return
+    }
+    onEventsChange?.()
+  }
+
+  const handleExecuteCommand = (text: string) => {
+    const command = parseVoiceCommand(text)
+
+    if (command.intent === 'summary_day' && command.date) {
+      const summary = summarizeDay(command.date, command.dateLabel)
+      setFeedback({
+        title: summary.title,
+        message: summary.speechText,
+        summary,
+      })
+      speak(summary.speechText)
+      return
+    }
+
+    if (command.intent === 'summary_week') {
+      const summary = summarizeNextSevenDays()
+      setFeedback({
+        title: summary.title,
+        message: summary.speechText,
+        summary,
+      })
+      speak(summary.speechText)
+      return
+    }
+
+    if (command.intent === 'countdown_query') {
+      const queryTitle = command.title ?? ''
+      const countdown = getCountdowns().find(
+        (item) => item.title.includes(queryTitle) || queryTitle.includes(item.title),
+      )
+      const message = countdown
+        ? formatCountdownResult(countdown.title, countdown.targetDate)
+        : `没有找到和“${queryTitle || '这个事项'}”匹配的倒计时。`
+      setFeedback({ title: '倒计时查询', message })
+      speak(message)
+      onCountdownChange?.()
+      return
+    }
+
+    if (command.intent === 'add' && command.date && command.title && command.startTime) {
+      addEvent({
+        title: command.title,
+        description: `由语音指令创建：${command.rawText}`,
+        date: command.date,
+        startTime: command.startTime,
+        type: command.eventType ?? 'schedule',
+        reminderEnabled: true,
+      })
+
+      const suggestion = getAssistantSuggestion(command.title)
+      const message = `已为你添加${command.dateLabel ?? command.date}${command.timeLabel ?? command.startTime}的${command.title}提醒${
+        suggestion ? `。助手建议：${suggestion}` : '。'
+      }`
+      setFeedback({ title: '添加成功', message })
+      speak(message)
+      notifyCalendarChange()
+      return
+    }
+
+    if (command.intent === 'query' && command.date) {
+      const events = getEventsByDate(command.date)
+      const message = formatEventsForSpeech(command.dateLabel ?? command.date, events)
+      setFeedback({ title: '日程查询', message })
+      speak(message)
+      return
+    }
+
+    if (command.intent === 'delete' && command.date) {
+      const events = getEventsByDate(command.date)
+      const matchedEvent = events.find((event) => {
+        const titleMatched = command.title ? event.title.includes(command.title) : true
+        const timeMatched = command.startTime ? event.startTime === command.startTime : true
+        return titleMatched && timeMatched
+      })
+      const deleted = matchedEvent ? deleteEvent(matchedEvent.id) : false
+      const message =
+        deleted && matchedEvent
+          ? `已删除${command.dateLabel ?? command.date}${matchedEvent.startTime}的${matchedEvent.title}。`
+          : `没有找到可删除的${command.dateLabel ?? command.date}日程。`
+      setFeedback({ title: deleted ? '删除成功' : '删除失败', message })
+      speak(message)
+      if (deleted) {
+        notifyCalendarChange()
+      }
+      return
+    }
+
+    if (command.intent === 'time') {
+      const now = new Date()
+      const message = `现在是 ${now.getHours()} 点 ${now.getMinutes()} 分。`
+      setFeedback({ title: '当前时间', message })
+      speak(message)
+      return
+    }
+
+    const message = '暂时没有识别到可执行的语音指令。你可以说：明天9点提醒我考试。'
+    setFeedback({ title: '未识别指令', message })
+    speak(message)
+  }
+
+  const executeTranscript = () => {
+    const text = transcript.trim()
+    if (!text) {
+      const message = '请先说出或输入一条语音指令。'
+      setFeedback({ title: '等待指令', message })
+      speak(message)
+      return
+    }
+
+    lastExecutedRef.current = text
+    handleExecuteCommand(text)
+  }
 
   const handleToggle = () => {
     if (isListening) {
       stopListening()
       return
     }
+    setFeedback(null)
+    lastExecutedRef.current = ''
     startListening()
   }
+
+  useEffect(() => {
+    const text = transcript.trim()
+    if (isListening || !text || lastExecutedRef.current === text) {
+      return
+    }
+
+    lastExecutedRef.current = text
+    handleExecuteCommand(text)
+  }, [isListening, transcript])
 
   return (
     <section className="voice-control" aria-label="语音输入">
       <div className="voice-control-header">
-        <h2 className="section-title">🎙️ 语音输入</h2>
-        <p className="voice-control-desc">点击按钮开始说话，识别结果将显示在下方</p>
+        <h2 className="section-title">语音输入</h2>
+        <p className="voice-control-desc">点击按钮开始说话，识别结果和执行反馈会显示在下方</p>
       </div>
 
       {!isSupported ? (
@@ -31,13 +245,23 @@ export default function VoiceControl() {
         </p>
       ) : (
         <>
-          <button
-            type="button"
-            className={`voice-control-btn${isListening ? ' voice-control-btn--listening' : ''}`}
-            onClick={handleToggle}
-          >
-            {isListening ? '正在听...点击停止' : '开始语音输入'}
-          </button>
+          <div className="voice-actions">
+            <button
+              type="button"
+              className={`voice-button voice-control-btn${isListening ? ' voice-button--listening voice-control-btn--listening' : ''}`}
+              onClick={handleToggle}
+            >
+              {isListening ? '正在听... 点击停止' : '开始语音输入'}
+            </button>
+            <button
+              type="button"
+              className="voice-execute-button"
+              onClick={executeTranscript}
+              disabled={!transcript.trim()}
+            >
+              执行语音指令
+            </button>
+          </div>
 
           {error && <p className="voice-control-error">{error}</p>}
 
@@ -46,6 +270,53 @@ export default function VoiceControl() {
             <p className="voice-control-transcript">
               {transcript || (isListening ? '请开始说话...' : '暂无识别内容')}
             </p>
+          </div>
+
+          <div className="voice-control-feedback" aria-live="polite">
+            <span className="voice-control-result-label">执行反馈</span>
+            {feedback ? (
+              <article className="voice-feedback-card">
+                <h3>{feedback.title}</h3>
+                {feedback.summary ? (
+                  <>
+                    <div className="voice-summary-stats">
+                      <span>{feedback.summary.eventCount} 项日程</span>
+                      <span>预计 {feedback.summary.totalDurationText}</span>
+                      <span>{feedback.summary.dateRange}</span>
+                    </div>
+                    {feedback.summary.emptyMessage ? (
+                      <p>{feedback.summary.emptyMessage}</p>
+                    ) : (
+                      <>
+                        <ul className="voice-summary-list">
+                          {feedback.summary.mainItems.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                        <div className="voice-summary-highlight">
+                          <strong>重点事项</strong>
+                          {feedback.summary.highlights.length > 0 ? (
+                            <ul>
+                              {feedback.summary.highlights.map((item) => (
+                                <li key={`${item.keyword}-${item.title}`}>
+                                  {item.title}：{item.message}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p>暂未识别到重点事项。</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <p>{feedback.message}</p>
+                )}
+              </article>
+            ) : (
+              <p className="voice-control-feedback-empty">等待语音指令执行。</p>
+            )}
           </div>
         </>
       )}
