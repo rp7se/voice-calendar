@@ -10,23 +10,24 @@ import AppShell from './components/layout/AppShell.tsx'
 import ContextPanel from './components/layout/ContextPanel.tsx'
 import Sidebar, { type WorkspaceId } from './components/layout/Sidebar.tsx'
 import Topbar from './components/layout/Topbar.tsx'
+import TasksContextPanel from './components/tasks/TasksContextPanel.tsx'
+import TasksWorkspace from './components/tasks/TasksWorkspace.tsx'
+import { filterTasksByCategory } from './components/tasks/taskUtils.ts'
 import NextEvent from './components/today/NextEvent.tsx'
 import TodayOverview from './components/today/TodayOverview.tsx'
 import TodayWorkspace from './components/today/TodayWorkspace.tsx'
 import { formatDate } from './utils/date.ts'
+import { getCategories } from './utils/storage.ts'
+import { getTasks } from './utils/taskStorage.ts'
 import './App.css'
 
 const WORKSPACE_PLACEHOLDERS: Record<
-  Exclude<WorkspaceId, 'today' | 'calendar'>,
+  Exclude<WorkspaceId, 'today' | 'calendar' | 'tasks'>,
   {
     title: string
     description: string
   }
 > = {
-  tasks: {
-    title: 'Tasks Workspace',
-    description: 'Tasks 将在后续 PR 中实现任务视图；当前先保留导航位置。',
-  },
   insights: {
     title: 'Insights Workspace',
     description: 'Insights 将在后续 PR 中承载时间分析和总结。',
@@ -42,8 +43,13 @@ function App() {
   const [eventsVersion, setEventsVersion] = useState(0)
   const [categoriesVersion, setCategoriesVersion] = useState(0)
   const [countdownVersion, setCountdownVersion] = useState(0)
+  const [taskVersion, setTaskVersion] = useState(0)
   const [isDayDetailOpen, setIsDayDetailOpen] = useState(false)
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('today')
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+
+  const selectedCategory =
+    getCategories().find((category) => category.id === selectedCategoryId) ?? null
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(formatDate(date))
@@ -56,15 +62,40 @@ function App() {
 
   const handleCategoriesChange = () => {
     setCategoriesVersion((version) => version + 1)
+    if (selectedCategoryId && !getCategories().some((item) => item.id === selectedCategoryId)) {
+      setSelectedCategoryId(null)
+    }
   }
 
   const handleCountdownChange = () => {
     setCountdownVersion((version) => version + 1)
   }
 
+  const handleTasksChange = () => {
+    setTaskVersion((version) => version + 1)
+  }
+
   const renderWorkspace = () => {
     if (activeWorkspace === 'today') {
-      return <TodayWorkspace onOpenCalendar={() => setActiveWorkspace('calendar')} />
+      return (
+        <TodayWorkspace
+          selectedCategoryId={selectedCategoryId}
+          selectedCategoryName={selectedCategory?.name ?? null}
+          taskRefreshVersion={taskVersion}
+          onTasksChange={handleTasksChange}
+          onOpenCalendar={() => setActiveWorkspace('calendar')}
+        />
+      )
+    }
+
+    if (activeWorkspace === 'tasks') {
+      return (
+        <TasksWorkspace
+          selectedCategoryId={selectedCategoryId}
+          selectedCategoryName={selectedCategory?.name ?? null}
+          onTasksChange={handleTasksChange}
+        />
+      )
     }
 
     if (activeWorkspace !== 'calendar') {
@@ -101,6 +132,15 @@ function App() {
     )
   }
 
+  const contextTitle =
+    activeWorkspace === 'tasks'
+      ? 'Task Planning'
+      : activeWorkspace === 'today'
+        ? 'Today & Voice'
+        : 'Calendar & Voice'
+
+  const scopedTasks = filterTasksByCategory(getTasks(), selectedCategoryId)
+
   return (
     <>
       <AmbientBackground />
@@ -111,12 +151,24 @@ function App() {
           sidebar={
             <Sidebar
               activeWorkspace={activeWorkspace}
+              selectedCategoryId={selectedCategoryId}
               onNavigate={setActiveWorkspace}
+              onSelectCategory={setSelectedCategoryId}
             />
           }
           topbar={<Topbar activeWorkspace={activeWorkspace} selectedDate={selectedDate} />}
           contextPanel={
-            <ContextPanel>
+            <ContextPanel
+              eyebrow={activeWorkspace === 'tasks' ? 'Tasks Context' : 'Context'}
+              title={contextTitle}
+            >
+              {activeWorkspace === 'tasks' && (
+                <TasksContextPanel
+                  tasks={scopedTasks}
+                  selectedCategoryName={selectedCategory?.name ?? null}
+                />
+              )}
+
               {activeWorkspace === 'today' && (
                 <div className="today-context-stack">
                   <NextEvent />
@@ -132,13 +184,15 @@ function App() {
                 eventsVersion={eventsVersion}
                 onCategoriesChange={handleCategoriesChange}
               />
-              <section className="day-detail-hint panel-card">
-                <h2 className="section-title">日期详情</h2>
-                <p>点击日历中的日期，查看和编辑当天事项。</p>
-                <button type="button" onClick={() => setIsDayDetailOpen(true)}>
-                  打开 {selectedDate}
-                </button>
-              </section>
+              {activeWorkspace !== 'tasks' && (
+                <section className="day-detail-hint panel-card">
+                  <h2 className="section-title">日期详情</h2>
+                  <p>点击日历中的日期，查看和编辑当天事项。</p>
+                  <button type="button" onClick={() => setIsDayDetailOpen(true)}>
+                    打开 {selectedDate}
+                  </button>
+                </section>
+              )}
             </ContextPanel>
           }
         >

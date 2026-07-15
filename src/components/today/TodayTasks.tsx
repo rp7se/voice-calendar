@@ -1,18 +1,45 @@
 import type { CalendarEvent } from '../../types/calendar.ts'
+import { getTasks, updateTask } from '../../utils/taskStorage.ts'
+import {
+  filterTasksByCategory,
+  formatDeadline,
+  formatDuration,
+  getTodayPendingTasks,
+} from '../tasks/taskUtils.ts'
 
 type TodayTasksProps = {
   events: CalendarEvent[]
+  selectedCategoryId?: string | null
+  refreshVersion?: number
+  onTasksChange?: () => void
 }
 
 function getTaskLikeEvents(events: CalendarEvent[]) {
   return events.filter((event) => event.type === 'work' || event.type === 'reminder')
 }
 
-export default function TodayTasks({ events }: TodayTasksProps) {
+export default function TodayTasks({
+  events,
+  selectedCategoryId = null,
+  refreshVersion = 0,
+  onTasksChange,
+}: TodayTasksProps) {
+  const todayTasks = getTodayPendingTasks(
+    filterTasksByCategory(getTasks(), selectedCategoryId),
+  )
   const taskLikeEvents = getTaskLikeEvents(events)
 
+  const handleCompleteTask = (taskId: string) => {
+    updateTask(taskId, { status: 'completed' })
+    onTasksChange?.()
+  }
+
   return (
-    <section className="today-section today-tasks" aria-labelledby="today-tasks-title">
+    <section
+      className="today-section today-tasks"
+      aria-labelledby="today-tasks-title"
+      data-refresh-version={refreshVersion}
+    >
       <div className="today-section-header">
         <div>
           <span>Today Tasks</span>
@@ -20,10 +47,27 @@ export default function TodayTasks({ events }: TodayTasksProps) {
         </div>
       </div>
 
-      {taskLikeEvents.length === 0 ? (
-        <p className="today-task-empty">
-          当前数据模型还没有独立任务状态；这里会优先显示今日工作和提醒类日程。
-        </p>
+      {todayTasks.length > 0 ? (
+        <ul className="today-task-list">
+          {todayTasks.map((task) => (
+            <li key={task.id} className="today-task-item">
+              <button
+                type="button"
+                className="today-task-check today-task-check--button"
+                aria-label={`完成 ${task.title}`}
+                onClick={() => handleCompleteTask(task.id)}
+              />
+              <div>
+                <strong>{task.title}</strong>
+                <span>
+                  {formatDeadline(task)} · {formatDuration(task.estimatedDurationMinutes)}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : taskLikeEvents.length === 0 ? (
+        <p className="today-task-empty">今天没有到期任务。</p>
       ) : (
         <ul className="today-task-list">
           {taskLikeEvents.map((event) => (

@@ -6,8 +6,15 @@ export function getTodayKey(date = new Date()): string {
   return formatDate(date)
 }
 
-export function getTodayEvents(date = new Date()): CalendarEvent[] {
-  return sortEventsByTime(getEventsByDate(getTodayKey(date)))
+export function getTodayEvents(
+  date = new Date(),
+  categoryId: string | null = null,
+): CalendarEvent[] {
+  const events = getEventsByDate(getTodayKey(date))
+  const scopedEvents = categoryId
+    ? events.filter((event) => event.categoryId === categoryId)
+    : events
+  return sortEventsByTime(scopedEvents)
 }
 
 export function sortEventsByTime(events: CalendarEvent[]): CalendarEvent[] {
