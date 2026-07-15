@@ -26,3 +26,7 @@ dist-ssr
 .vite/
 
 .vite/
+
+# Backend build artifacts
+backend/build/
+backend/vcpkg_installed/
