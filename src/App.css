@@ -1632,7 +1632,6 @@
 .category-panel,
 .day-detail,
 .day-detail-modal,
-.completion-modal,
 .day-detail-modal-section,
 .day-detail-modal-form,
 .time-block-planner {
@@ -1743,8 +1742,7 @@
 
 .voice-actions,
 .time-block-actions,
-.time-block-footer,
-.completion-modal-actions {
+.time-block-footer {
   display: flex;
   gap: var(--space-3);
 }
@@ -1770,8 +1768,7 @@
 .category-date-card button,
 .time-block-actions button,
 .time-block-save,
-.time-block-cancel,
-.completion-btn {
+.time-block-cancel {
   min-height: 36px;
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
@@ -1794,8 +1791,7 @@
 .form-submit-btn,
 .day-detail-hint button,
 .time-block-actions button,
-.time-block-save,
-.completion-btn--done {
+.time-block-save {
   border-color: var(--color-accent-border);
   background: var(--color-accent-soft);
   color: var(--color-accent-ink);
@@ -1822,8 +1818,7 @@
 .form-submit-btn:hover,
 .time-block-actions button:hover,
 .time-block-save:hover,
-.time-block-cancel:hover,
-.completion-btn:hover {
+.time-block-cancel:hover {
   transform: translateY(-1px);
   border-color: var(--color-accent-border);
   background: var(--color-accent-hover-soft);
@@ -1834,8 +1829,7 @@
 .voice-execute-button:active,
 .voice-control-btn:active,
 .calendar-nav-btn:active,
-.form-submit-btn:active,
-.completion-btn:active {
+.form-submit-btn:active {
   transform: translateY(0);
 }
 
@@ -3171,8 +3165,7 @@
   }
 }
 
-.day-detail-modal-overlay,
-.completion-modal-overlay {
+.day-detail-modal-overlay {
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
@@ -3367,8 +3360,7 @@
   margin-top: var(--space-4);
 }
 
-.time-block-cancel,
-.completion-btn--cancel {
+.time-block-cancel {
   background: transparent;
   color: var(--color-text-secondary);
 }
@@ -3493,69 +3485,6 @@
 
 .form-submit-btn {
   padding: 0 var(--space-4);
-}
-
-.completion-modal {
-  width: min(100%, 420px);
-  padding: var(--space-6);
-  border-radius: var(--radius-xl);
-}
-
-.completion-modal-header h2,
-.completion-modal-feedback h2 {
-  margin: 0 0 var(--space-3);
-  font-size: 1.25rem;
-  text-align: center;
-}
-
-.completion-modal-question,
-.completion-feedback-message {
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-  text-align: center;
-}
-
-.completion-modal-actions {
-  flex-direction: column;
-  margin-top: var(--space-5);
-}
-
-.completion-btn {
-  width: 100%;
-  padding: 0 var(--space-4);
-}
-
-.completion-btn--pending {
-  border-color: var(--color-warning-border);
-  background: var(--color-warning-soft);
-  color: var(--color-warning-ink);
-}
-
-.completion-modal-feedback {
-  text-align: center;
-}
-
-.completion-feedback-emoji {
-  margin-bottom: var(--space-2);
-  font-size: 34px;
-  line-height: 1;
-}
-
-.completion-poem {
-  margin: var(--space-4) 0 var(--space-5);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border-subtle);
-  border-left-color: var(--color-accent);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-inset);
-  color: var(--color-text-primary);
-  font-size: 14px;
-  line-height: 1.7;
-  text-align: left;
-}
-
-.completion-btn--wide {
-  margin-top: var(--space-2);
 }
 
 .voice-control .section-eyebrow {
@@ -3700,8 +3629,7 @@
     width: 100%;
   }
 
-  .day-detail-modal-overlay,
-  .completion-modal-overlay {
+  .day-detail-modal-overlay {
     align-items: stretch;
     padding: var(--space-3);
   }

@@ -1,7 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import CompletionFeedbackModal from './CompletionFeedbackModal.tsx'
 import type { CountdownItem } from '../types/calendar.ts'
-import { addCountdown, getCountdowns } from '../utils/storage.ts'
+import { addCountdown, deleteCountdown, getCountdowns } from '../utils/storage.ts'
 import { formatCountdownLabel, getDaysBetweenToday } from '../utils/date.ts'
 
 const EMPTY_FORM = {
@@ -35,7 +34,6 @@ export default function CountdownPanel({
 }: CountdownPanelProps) {
   const [countdowns, setCountdowns] = useState<CountdownItem[]>(() => getCountdowns())
   const [form, setForm] = useState(EMPTY_FORM)
-  const [pendingDelete, setPendingDelete] = useState<CountdownItem | null>(null)
 
   const refreshCountdowns = () => {
     setCountdowns(getCountdowns())
@@ -63,26 +61,13 @@ export default function CountdownPanel({
   }
 
   const handleRequestDelete = (item: CountdownItem) => {
-    setPendingDelete(item)
-  }
-
-  const handleModalClose = () => {
-    setPendingDelete(null)
-  }
-
-  const handleModalDeleted = () => {
+    deleteCountdown(item.id)
     refreshCountdowns()
     onCountdownChange?.()
   }
 
   return (
     <section className="countdown-panel" aria-label="倒计时">
-      <CompletionFeedbackModal
-        countdown={pendingDelete}
-        onClose={handleModalClose}
-        onDeleted={handleModalDeleted}
-      />
-
       <header className="countdown-panel-header">
         <div>
           <span>Countdown</span>
