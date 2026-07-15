@@ -1,13 +1,17 @@
 import type { CalendarEvent } from '../../types/calendar.ts'
 import { formatDate } from '../../utils/date.ts'
 import { getEventsByDate } from '../../utils/storage.ts'
+import { filterEventsByCategory } from '../category/categoryFilters.ts'
 
 export function getTodayKey(date = new Date()): string {
   return formatDate(date)
 }
 
-export function getTodayEvents(date = new Date()): CalendarEvent[] {
-  return sortEventsByTime(getEventsByDate(getTodayKey(date)))
+export function getTodayEvents(
+  date = new Date(),
+  categoryId: string | null = null,
+): CalendarEvent[] {
+  return sortEventsByTime(filterEventsByCategory(getEventsByDate(getTodayKey(date)), categoryId))
 }
 
 export function sortEventsByTime(events: CalendarEvent[]): CalendarEvent[] {

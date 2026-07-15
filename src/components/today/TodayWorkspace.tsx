@@ -3,6 +3,8 @@ import TodayTasks from './TodayTasks.tsx'
 import { getTodayEvents } from './todayData.ts'
 
 type TodayWorkspaceProps = {
+  selectedCategoryId?: string | null
+  selectedCategoryName?: string | null
   onOpenCalendar: () => void
 }
 
@@ -24,10 +26,12 @@ function getGreeting(date: Date): string {
 }
 
 export default function TodayWorkspace({
+  selectedCategoryId = null,
+  selectedCategoryName = null,
   onOpenCalendar,
 }: TodayWorkspaceProps) {
   const now = new Date()
-  const todayEvents = getTodayEvents(now)
+  const todayEvents = getTodayEvents(now, selectedCategoryId)
   const arrangementText =
     todayEvents.length === 0
       ? '今天还没有安排，可以放松一下。'
@@ -41,6 +45,9 @@ export default function TodayWorkspace({
         <p>
           {getGreeting(now)} · {arrangementText}
         </p>
+        {selectedCategoryName && (
+          <span className="workspace-filter-note">当前视图：{selectedCategoryName}</span>
+        )}
       </header>
 
       <DailyTimeline events={todayEvents} onOpenCalendar={onOpenCalendar} />

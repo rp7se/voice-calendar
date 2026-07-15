@@ -1,7 +1,13 @@
 import { getNextTodayEvent, getTodayEvents } from './todayData.ts'
 
-export default function TodayOverview() {
-  const events = getTodayEvents()
+type TodayOverviewProps = {
+  selectedCategoryId?: string | null
+}
+
+export default function TodayOverview({
+  selectedCategoryId = null,
+}: TodayOverviewProps) {
+  const events = getTodayEvents(new Date(), selectedCategoryId)
   const nextEvent = getNextTodayEvent(events)
   const completedCount = events.filter((event) => {
     if (!event.endTime) {
