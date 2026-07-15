@@ -1,33 +1,52 @@
 import { useMemo, useState, type DragEvent } from 'react'
+import CalendarDayCell from './calendar/CalendarDayCell.tsx'
+import CalendarHeader from './calendar/CalendarHeader.tsx'
+import { filterEventsByCategory, getCategoryDateSet } from './category/categoryFilters.ts'
+import type { CalendarEvent } from '../types/calendar.ts'
 import { getEvents } from '../utils/storage.ts'
-import {
-  formatDate,
-  formatYearMonth,
-  getMonthDays,
-  isToday,
-} from '../utils/date.ts'
+import { formatDate, getMonthDays, isToday } from '../utils/date.ts'
 import { getHolidayByDate } from '../utils/holiday.ts'
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
 type CalendarViewProps = {
   selectedDate: string
+  selectedCategoryId?: string | null
+  selectedCategoryName?: string | null
   onSelectDate: (date: Date) => void
   eventsVersion?: number
 }
 
-function buildEventCountMap(): Record<string, number> {
-  const counts: Record<string, number> = {}
-  for (const event of getEvents()) {
-    counts[event.date] = (counts[event.date] ?? 0) + 1
+function buildEventMap(categoryId: string | null): Record<string, CalendarEvent[]> {
+  const eventMap: Record<string, CalendarEvent[]> = {}
+
+  for (const event of filterEventsByCategory(getEvents(), categoryId)) {
+    eventMap[event.date] = eventMap[event.date] ?? []
+    eventMap[event.date].push(event)
   }
-  return counts
+
+  for (const events of Object.values(eventMap)) {
+    events.sort((a, b) => {
+      const timeDiff = a.startTime.localeCompare(b.startTime)
+      if (timeDiff !== 0) {
+        return timeDiff
+      }
+      return a.title.localeCompare(b.title)
+    })
+  }
+
+  return eventMap
+}
+
+function formatCalendarMonth(year: number, month: number): string {
+  return `${year} 年 ${month + 1} 月`
 }
 
 export default function CalendarView({
   selectedDate,
+  selectedCategoryId = null,
+  selectedCategoryName = null,
   onSelectDate,
-  eventsVersion = 0,
 }: CalendarViewProps) {
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
@@ -39,10 +58,8 @@ export default function CalendarView({
     [viewYear, viewMonth],
   )
 
-  const eventCounts = useMemo(
-    () => buildEventCountMap(),
-    [viewYear, viewMonth, eventsVersion],
-  )
+  const eventMap = buildEventMap(selectedCategoryId)
+  const linkedDateSet = selectedCategoryId ? getCategoryDateSet(selectedCategoryId) : null
 
   const goToPrevMonth = () => {
     if (viewMonth === 0) {
@@ -62,6 +79,13 @@ export default function CalendarView({
     setViewMonth((month) => month + 1)
   }
 
+  const goToToday = () => {
+    const current = new Date()
+    setViewYear(current.getFullYear())
+    setViewMonth(current.getMonth())
+    onSelectDate(current)
+  }
+
   const handleDragStart = (
     event: DragEvent<HTMLButtonElement>,
     dateKey: string,
@@ -78,18 +102,13 @@ export default function CalendarView({
 
   return (
     <section className="calendar-view" aria-label="月历">
-      <header className="section-header">
-        <h2 className="section-title">日历</h2>
-      </header>
-      <div className="calendar-toolbar">
-        <button type="button" className="calendar-nav-btn" onClick={goToPrevMonth}>
-          上个月
-        </button>
-        <h2 className="calendar-title">{formatYearMonth(viewYear, viewMonth)}</h2>
-        <button type="button" className="calendar-nav-btn" onClick={goToNextMonth}>
-          下个月
-        </button>
-      </div>
+      <CalendarHeader
+        monthLabel={formatCalendarMonth(viewYear, viewMonth)}
+        selectedCategoryName={selectedCategoryName}
+        onPrevMonth={goToPrevMonth}
+        onNextMonth={goToNextMonth}
+        onToday={goToToday}
+      />
 
       <div className="calendar-weekdays">
         {WEEKDAY_LABELS.map((label) => (
@@ -102,42 +121,26 @@ export default function CalendarView({
       <div className="calendar-grid">
         {monthDays.map((day) => {
           const dateKey = formatDate(day.date)
-          const eventCount = eventCounts[dateKey] ?? 0
+          const events = eventMap[dateKey] ?? []
           const holiday = getHolidayByDate(dateKey)
           const dayIsToday = isToday(day.date)
           const dayIsSelected = dateKey === selectedDate
 
           return (
-            <button
+            <CalendarDayCell
               key={dateKey}
-              type="button"
-              draggable={true}
-              className={[
-                'calendar-day',
-                !day.isCurrentMonth && 'calendar-day--muted',
-                dayIsToday && 'calendar-day--today',
-                dayIsSelected && 'calendar-day--selected',
-                draggingDate === dateKey && 'calendar-day--dragging',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              onClick={() => onSelectDate(day.date)}
-              onDragStart={(event) => handleDragStart(event, dateKey)}
+              day={day}
+              dateKey={dateKey}
+              events={events}
+              holiday={holiday}
+              isSelected={dayIsSelected}
+              isToday={dayIsToday}
+              isCategoryLinked={linkedDateSet?.has(dateKey) ?? false}
+              isDragging={draggingDate === dateKey}
+              onSelectDate={onSelectDate}
+              onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-            >
-              <span className="calendar-day-number">{day.day}</span>
-              {holiday && (
-                <span className={`calendar-day-holiday calendar-day-holiday--${holiday.type}`}>
-                  {holiday.name}
-                </span>
-              )}
-              {eventCount > 0 && (
-                <span className="calendar-day-events">
-                  <span className="calendar-day-dot" aria-hidden />
-                  {eventCount} 项日程
-                </span>
-              )}
-            </button>
+            />
           )
         })}
       </div>

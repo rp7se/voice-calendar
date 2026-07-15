@@ -15,6 +15,8 @@ import {
 
 type CategoryPanelProps = {
   eventsVersion?: number
+  selectedCategoryId?: string | null
+  onSelectCategory?: (categoryId: string | null) => void
   onCategoriesChange?: () => void
 }
 
@@ -71,22 +73,30 @@ function sortEventsByTime(events: CalendarEvent[]): CalendarEvent[] {
 
 export default function CategoryPanel({
   eventsVersion = 0,
+  selectedCategoryId: externalSelectedCategoryId,
+  onSelectCategory,
   onCategoriesChange,
 }: CategoryPanelProps) {
   const [categories, setCategories] = useState<EventCategory[]>([])
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [localSelectedCategoryId, setLocalSelectedCategoryId] = useState<string | null>(null)
   const [categoryEvents, setCategoryEvents] = useState<CalendarEvent[]>([])
   const [categoryDates, setCategoryDates] = useState<string[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null)
   const [dropFeedback, setDropFeedback] = useState('')
   const [dateLinksVersion, setDateLinksVersion] = useState(0)
+  const selectedCategoryId = externalSelectedCategoryId ?? localSelectedCategoryId
+
+  const updateSelectedCategory = (categoryId: string | null) => {
+    setLocalSelectedCategoryId(categoryId)
+    onSelectCategory?.(categoryId)
+  }
 
   const refreshCategories = () => {
     const list = getCategories()
     setCategories(list)
     if (selectedCategoryId && !list.some((item) => item.id === selectedCategoryId)) {
-      setSelectedCategoryId(null)
+      updateSelectedCategory(null)
       setCategoryEvents([])
       setCategoryDates([])
     }
@@ -142,13 +152,13 @@ export default function CategoryPanel({
   }
 
   const handleSelectCategory = (categoryId: string) => {
-    setSelectedCategoryId(categoryId)
+    updateSelectedCategory(categoryId)
   }
 
   const handleDeleteCategory = (categoryId: string) => {
     deleteCategory(categoryId)
     if (selectedCategoryId === categoryId) {
-      setSelectedCategoryId(null)
+      updateSelectedCategory(null)
       setCategoryEvents([])
       setCategoryDates([])
     }
@@ -174,10 +184,10 @@ export default function CategoryPanel({
 
     const alreadyLinked = getDatesByCategory(category.id).includes(date)
     addDateToCategory(category.id, date)
-    setSelectedCategoryId(category.id)
+    updateSelectedCategory(category.id)
     setDropFeedback(
       alreadyLinked
-        ? `${date} 已经在 ${category.name} 文件夹中了`
+        ? `${date} 已经在 ${category.name} 分类中了`
         : `已将 ${date} 加入 ${category.name}`,
     )
     setDateLinksVersion((version) => version + 1)
@@ -194,7 +204,7 @@ export default function CategoryPanel({
   }
 
   return (
-    <section className="category-panel" aria-label="分类文件夹">
+    <section className="category-panel" aria-label="分类">
       <header className="category-panel-header">
         <h2 className="section-title">分类</h2>
       </header>
@@ -261,7 +271,7 @@ export default function CategoryPanel({
                   onClick={() => handleSelectCategory(category.id)}
                 >
                   <span className="category-folder-icon" aria-hidden>
-                    📁
+                    <span className="category-mark" />
                   </span>
                   <span className="category-folder-main">
                     <span className="category-folder-name">{category.name}</span>
@@ -312,7 +322,7 @@ export default function CategoryPanel({
           <div className="category-linked-dates">
             <h3 className="category-events-title">已加入的日期</h3>
             {categoryDates.length === 0 ? (
-              <p className="category-events-empty">把日历日期拖到分类文件夹，即可加入这里。</p>
+              <p className="category-events-empty">把日历日期拖到分类，即可加入这里。</p>
             ) : (
               <ul className="category-date-list">
                 {categoryDates.map((date) => {

@@ -1,7 +1,11 @@
 import { getNextTodayEvent, getTodayEvents, formatEventTimeRange } from './todayData.ts'
 
-export default function NextEvent() {
-  const events = getTodayEvents()
+type NextEventProps = {
+  selectedCategoryId?: string | null
+}
+
+export default function NextEvent({ selectedCategoryId = null }: NextEventProps) {
+  const events = getTodayEvents(new Date(), selectedCategoryId)
   const nextEvent = getNextTodayEvent(events)
 
   return (

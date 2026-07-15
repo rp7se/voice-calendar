@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import AmbientBackground from './components/AmbientBackground.tsx'
 import CalendarView from './components/CalendarView.tsx'
+import CalendarDayContext from './components/calendar/CalendarDayContext.tsx'
+import { getCategoryById } from './components/category/categoryFilters.ts'
 import CategoryPanel from './components/CategoryPanel.tsx'
 import CountdownBubbleLayer from './components/CountdownBubbleLayer.tsx'
 import CountdownPanel from './components/CountdownPanel.tsx'
@@ -25,7 +27,7 @@ const WORKSPACE_PLACEHOLDERS: Record<
 > = {
   tasks: {
     title: 'Tasks Workspace',
-    description: 'Tasks 将在后续 PR 中实现任务视图；当前先保留导航位置。',
+    description: 'Tasks 将在后续 PR 中实现完整任务视图；当前先保留导航入口。',
   },
   insights: {
     title: 'Insights Workspace',
@@ -44,9 +46,14 @@ function App() {
   const [countdownVersion, setCountdownVersion] = useState(0)
   const [isDayDetailOpen, setIsDayDetailOpen] = useState(false)
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('today')
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const selectedCategory = getCategoryById(selectedCategoryId)
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(formatDate(date))
+  }
+
+  const openDayDetailModal = () => {
     setIsDayDetailOpen(true)
   }
 
@@ -56,6 +63,9 @@ function App() {
 
   const handleCategoriesChange = () => {
     setCategoriesVersion((version) => version + 1)
+    if (selectedCategoryId && !getCategoryById(selectedCategoryId)) {
+      setSelectedCategoryId(null)
+    }
   }
 
   const handleCountdownChange = () => {
@@ -64,7 +74,13 @@ function App() {
 
   const renderWorkspace = () => {
     if (activeWorkspace === 'today') {
-      return <TodayWorkspace onOpenCalendar={() => setActiveWorkspace('calendar')} />
+      return (
+        <TodayWorkspace
+          selectedCategoryId={selectedCategoryId}
+          selectedCategoryName={selectedCategory?.name ?? null}
+          onOpenCalendar={() => setActiveWorkspace('calendar')}
+        />
+      )
     }
 
     if (activeWorkspace !== 'calendar') {
@@ -83,17 +99,10 @@ function App() {
 
     return (
       <div className="workspace-calendar">
-        <div className="workspace-heading">
-          <div>
-            <span>Primary Workspace</span>
-            <h2>Calendar</h2>
-          </div>
-          <button type="button" onClick={() => setIsDayDetailOpen(true)}>
-            打开 {selectedDate}
-          </button>
-        </div>
         <CalendarView
           selectedDate={selectedDate}
+          selectedCategoryId={selectedCategoryId}
+          selectedCategoryName={selectedCategory?.name ?? null}
           onSelectDate={handleSelectDate}
           eventsVersion={eventsVersion}
         />
@@ -111,18 +120,45 @@ function App() {
           sidebar={
             <Sidebar
               activeWorkspace={activeWorkspace}
+              selectedCategoryId={selectedCategoryId}
               onNavigate={setActiveWorkspace}
+              onSelectCategory={setSelectedCategoryId}
             />
           }
           topbar={<Topbar activeWorkspace={activeWorkspace} selectedDate={selectedDate} />}
           contextPanel={
-            <ContextPanel>
+            <ContextPanel
+              eyebrow={activeWorkspace === 'calendar' ? 'Calendar Context' : 'Context'}
+              title={activeWorkspace === 'calendar' ? selectedDate : 'Today & Voice'}
+            >
+              {selectedCategory && (
+                <section className="category-focus-card" aria-label="Current category filter">
+                  <span>当前分类</span>
+                  <strong>{selectedCategory.name}</strong>
+                  <button type="button" onClick={() => setSelectedCategoryId(null)}>
+                    查看全部
+                  </button>
+                </section>
+              )}
+
+              {activeWorkspace === 'calendar' && (
+                <CalendarDayContext
+                  selectedDate={selectedDate}
+                  selectedCategoryId={selectedCategoryId}
+                  selectedCategoryName={selectedCategory?.name ?? null}
+                  eventsVersion={eventsVersion}
+                  categoriesVersion={categoriesVersion}
+                  onOpenDayDetail={openDayDetailModal}
+                />
+              )}
+
               {activeWorkspace === 'today' && (
                 <div className="today-context-stack">
-                  <NextEvent />
-                  <TodayOverview />
+                  <NextEvent selectedCategoryId={selectedCategoryId} />
+                  <TodayOverview selectedCategoryId={selectedCategoryId} />
                 </div>
               )}
+
               <VoiceControl
                 onCalendarChange={handleEventsChange}
                 onCategoryChange={handleCategoriesChange}
@@ -130,15 +166,10 @@ function App() {
               <CountdownPanel onCountdownChange={handleCountdownChange} />
               <CategoryPanel
                 eventsVersion={eventsVersion}
+                selectedCategoryId={selectedCategoryId}
+                onSelectCategory={setSelectedCategoryId}
                 onCategoriesChange={handleCategoriesChange}
               />
-              <section className="day-detail-hint panel-card">
-                <h2 className="section-title">日期详情</h2>
-                <p>点击日历中的日期，查看和编辑当天事项。</p>
-                <button type="button" onClick={() => setIsDayDetailOpen(true)}>
-                  打开 {selectedDate}
-                </button>
-              </section>
             </ContextPanel>
           }
         >
