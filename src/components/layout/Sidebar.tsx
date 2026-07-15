@@ -4,7 +4,6 @@ export type WorkspaceId = 'today' | 'calendar' | 'tasks' | 'insights' | 'setting
 
 type SidebarProps = {
   activeWorkspace: WorkspaceId
-  categoriesVersion: number
   onNavigate: (workspace: WorkspaceId) => void
 }
 
