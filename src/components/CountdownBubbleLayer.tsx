@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { CountdownItem } from '../types/calendar.ts'
 import { getCountdowns } from '../utils/storage.ts'
-import { formatCountdownLabel, formatCountdownSpeech } from '../utils/date.ts'
+import {
+  formatCountdownLabel,
+  formatCountdownSpeech,
+  getDaysBetweenToday,
+} from '../utils/date.ts'
 
 type CountdownBubbleLayerProps = {
   refreshVersion?: number
@@ -9,30 +13,19 @@ type CountdownBubbleLayerProps = {
 
 type BubblePhysics = {
   id: string
-  title: string
-  targetDate: string
   x: number
   y: number
   vx: number
   vy: number
-  width: number
-  height: number
+  size: number
 }
 
-type BubbleBounds = Pick<BubblePhysics, 'x' | 'y' | 'width' | 'height'>
+type BubbleBounds = Pick<BubblePhysics, 'x' | 'y' | 'size'>
 
-const BUBBLE_SIZE = 104
-const BUBBLE_WIDTH = BUBBLE_SIZE
-const BUBBLE_HEIGHT = BUBBLE_SIZE
-const MIN_GAP = 16
-const SPEED = 0.42
-const OBSTACLE_PADDING = 18
-const AVOID_SELECTORS = [
-  '.app-header',
-  '.calendar-view',
-  '.countdown-panel',
-  '.right-sidebar',
-]
+const MIN_GAP = 18
+const SPEED = 0.34
+const MAX_DESKTOP_BUBBLES = 8
+const MAX_MOBILE_BUBBLES = 4
 
 function speakCountdown(title: string, targetDate: string): void {
   try {
@@ -48,66 +41,48 @@ function speakCountdown(title: string, targetDate: string): void {
   }
 }
 
-function getObstacleRects(): DOMRect[] {
-  return AVOID_SELECTORS.flatMap((selector) => {
-    const element = document.querySelector(selector)
-    return element ? [element.getBoundingClientRect()] : []
-  })
-}
-
-function intersectsRect(a: BubbleBounds, rect: DOMRect, padding: number): boolean {
+function supportsReducedMotion(): boolean {
   return (
-    a.x < rect.right + padding &&
-    a.x + a.width > rect.left - padding &&
-    a.y < rect.bottom + padding &&
-    a.y + a.height > rect.top - padding
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
   )
 }
 
-function intersectsObstacles(bounds: BubbleBounds, obstacles: DOMRect[]): boolean {
-  return obstacles.some((rect) => intersectsRect(bounds, rect, OBSTACLE_PADDING))
+function getBubbleSize(item: CountdownItem): number {
+  const days = getDaysBetweenToday(item.targetDate)
+  if (days !== null && days >= 0 && days <= 7) {
+    return 128
+  }
+  if (days !== null && days > 7 && days <= 30) {
+    return 116
+  }
+  return 104
+}
+
+function getUrgencyClass(targetDate: string): string {
+  const days = getDaysBetweenToday(targetDate)
+  if (days === null) {
+    return 'countdown-bubble--neutral'
+  }
+  if (days === 0) {
+    return 'countdown-bubble--today'
+  }
+  if (days > 0 && days <= 7) {
+    return 'countdown-bubble--soon'
+  }
+  if (days < 0) {
+    return 'countdown-bubble--past'
+  }
+  return 'countdown-bubble--future'
 }
 
 function intersectsBubble(a: BubbleBounds, b: BubbleBounds): boolean {
   return (
-    a.x < b.x + b.width + MIN_GAP &&
-    a.x + a.width + MIN_GAP > b.x &&
-    a.y < b.y + b.height + MIN_GAP &&
-    a.y + a.height + MIN_GAP > b.y
+    a.x < b.x + b.size + MIN_GAP &&
+    a.x + a.size + MIN_GAP > b.x &&
+    a.y < b.y + b.size + MIN_GAP &&
+    a.y + a.size + MIN_GAP > b.y
   )
-}
-
-function resolveObstacleCollision(bubble: BubblePhysics, rect: DOMRect, padding: number): void {
-  const bRight = bubble.x + bubble.width
-  const bBottom = bubble.y + bubble.height
-  const oLeft = rect.left - padding
-  const oTop = rect.top - padding
-  const oRight = rect.right + padding
-  const oBottom = rect.bottom + padding
-
-  if (bRight <= oLeft || bubble.x >= oRight || bBottom <= oTop || bubble.y >= oBottom) {
-    return
-  }
-
-  const overlapLeft = bRight - oLeft
-  const overlapRight = oRight - bubble.x
-  const overlapTop = bBottom - oTop
-  const overlapBottom = oBottom - bubble.y
-  const minOverlap = Math.min(overlapLeft, overlapRight, overlapTop, overlapBottom)
-
-  if (minOverlap === overlapLeft) {
-    bubble.x = oLeft - bubble.width
-    bubble.vx = -Math.abs(bubble.vx)
-  } else if (minOverlap === overlapRight) {
-    bubble.x = oRight
-    bubble.vx = Math.abs(bubble.vx)
-  } else if (minOverlap === overlapTop) {
-    bubble.y = oTop - bubble.height
-    bubble.vy = -Math.abs(bubble.vy)
-  } else {
-    bubble.y = oBottom
-    bubble.vy = Math.abs(bubble.vy)
-  }
 }
 
 function separateBubbles(bubbles: BubblePhysics[]): void {
@@ -115,14 +90,14 @@ function separateBubbles(bubbles: BubblePhysics[]): void {
     for (let j = i + 1; j < bubbles.length; j++) {
       const a = bubbles[i]
       const b = bubbles[j]
-      const centerAX = a.x + a.width / 2
-      const centerAY = a.y + a.height / 2
-      const centerBX = b.x + b.width / 2
-      const centerBY = b.y + b.height / 2
+      const centerAX = a.x + a.size / 2
+      const centerAY = a.y + a.size / 2
+      const centerBX = b.x + b.size / 2
+      const centerBY = b.y + b.size / 2
       let dx = centerBX - centerAX
       let dy = centerBY - centerAY
       const dist = Math.hypot(dx, dy) || 1
-      const minDist = (a.width + b.width) / 2 + MIN_GAP
+      const minDist = (a.size + b.size) / 2 + MIN_GAP
 
       if (dist >= minDist) {
         continue
@@ -135,73 +110,60 @@ function separateBubbles(bubbles: BubblePhysics[]): void {
       a.y -= (dy * overlap) / 2
       b.x += (dx * overlap) / 2
       b.y += (dy * overlap) / 2
-      a.vx -= dx * 0.02
-      a.vy -= dy * 0.02
-      b.vx += dx * 0.02
-      b.vy += dy * 0.02
+      a.vx -= dx * 0.015
+      a.vy -= dy * 0.015
+      b.vx += dx * 0.015
+      b.vy += dy * 0.015
     }
   }
 }
 
 function findSafePosition(
   existing: BubblePhysics[],
-  obstacles: DOMRect[],
-  viewportWidth: number,
-  viewportHeight: number,
+  width: number,
+  height: number,
+  size: number,
   seed: number,
 ): { x: number; y: number } {
-  for (let attempt = 0; attempt < 60; attempt++) {
-    const x =
-      MIN_GAP + Math.random() * Math.max(MIN_GAP, viewportWidth - BUBBLE_WIDTH - MIN_GAP * 2)
-    const y =
-      MIN_GAP + Math.random() * Math.max(MIN_GAP, viewportHeight - BUBBLE_HEIGHT - MIN_GAP * 2)
-    const candidate: BubbleBounds = {
-      x,
-      y,
-      width: BUBBLE_WIDTH,
-      height: BUBBLE_HEIGHT,
-    }
+  for (let attempt = 0; attempt < 54; attempt++) {
+    const sequence = seed * 17 + attempt * 11
+    const xRatio = (sequence * 0.61803398875) % 1
+    const yRatio = (sequence * 0.41421356237) % 1
+    const x = MIN_GAP + xRatio * Math.max(MIN_GAP, width - size - MIN_GAP * 2)
+    const y = MIN_GAP + yRatio * Math.max(MIN_GAP, height - size - MIN_GAP * 2)
+    const candidate = { x, y, size }
 
-    if (intersectsObstacles(candidate, obstacles)) {
-      continue
+    if (!existing.some((bubble) => intersectsBubble(candidate, bubble))) {
+      return { x, y }
     }
-
-    if (existing.some((bubble) => intersectsBubble(candidate, bubble))) {
-      continue
-    }
-
-    return { x, y }
   }
 
-  const edgeX = seed % 2 === 0 ? MIN_GAP : Math.max(MIN_GAP, viewportWidth - BUBBLE_WIDTH - MIN_GAP)
-  const edgeY = MIN_GAP + seed * (BUBBLE_HEIGHT + MIN_GAP)
+  const column = seed % 3
+  const row = Math.floor(seed / 3)
   return {
-    x: edgeX,
-    y: Math.min(edgeY, viewportHeight - BUBBLE_HEIGHT - MIN_GAP),
+    x: MIN_GAP + column * (size + MIN_GAP),
+    y: MIN_GAP + row * (size + MIN_GAP),
   }
 }
 
 function createInitialBubbles(
   items: CountdownItem[],
-  obstacles: DOMRect[],
-  viewportWidth: number,
-  viewportHeight: number,
+  width: number,
+  height: number,
 ): BubblePhysics[] {
   const bubbles: BubblePhysics[] = []
 
   items.forEach((item, index) => {
-    const { x, y } = findSafePosition(bubbles, obstacles, viewportWidth, viewportHeight, index)
-    const angle = (index * 1.7 + 0.5) % (Math.PI * 2)
+    const size = getBubbleSize(item)
+    const { x, y } = findSafePosition(bubbles, width, height, size, index + 1)
+    const angle = (index * 1.46 + 0.7) % (Math.PI * 2)
     bubbles.push({
       id: item.id,
-      title: item.title,
-      targetDate: item.targetDate,
       x,
       y,
       vx: Math.cos(angle) * SPEED,
       vy: Math.sin(angle) * SPEED,
-      width: BUBBLE_WIDTH,
-      height: BUBBLE_HEIGHT,
+      size,
     })
   })
 
@@ -211,85 +173,100 @@ function createInitialBubbles(
 export default function CountdownBubbleLayer({
   refreshVersion = 0,
 }: CountdownBubbleLayerProps) {
-  const [bubbles, setBubbles] = useState<BubblePhysics[]>([])
-  const [countdowns, setCountdowns] = useState<CountdownItem[]>([])
+  const layerRef = useRef<HTMLDivElement | null>(null)
+  const bubbleRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const pausedIdsRef = useRef(new Set<string>())
 
-  useEffect(() => {
-    setCountdowns(getCountdowns())
+  const countdowns = useMemo(() => {
+    if (refreshVersion < 0) {
+      return []
+    }
+
+    const maxItems =
+      typeof window !== 'undefined' && window.innerWidth <= 680
+        ? MAX_MOBILE_BUBBLES
+        : MAX_DESKTOP_BUBBLES
+
+    return getCountdowns()
+      .sort((a, b) => a.targetDate.localeCompare(b.targetDate))
+      .slice(0, maxItems)
   }, [refreshVersion])
 
   useEffect(() => {
-    if (countdowns.length === 0) {
-      setBubbles([])
+    const layer = layerRef.current
+    if (!layer || countdowns.length === 0) {
       return
     }
 
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-    let physics = createInitialBubbles(
-      countdowns,
-      getObstacleRects(),
-      viewportWidth,
-      viewportHeight,
-    )
+    const applyBubbleStyles = (physics: BubblePhysics[]) => {
+      for (const bubble of physics) {
+        const element = bubbleRefs.current[bubble.id]
+        if (!element) {
+          continue
+        }
+        element.style.width = `${bubble.size}px`
+        element.style.height = `${bubble.size}px`
+        element.style.transform = `translate3d(${bubble.x}px, ${bubble.y}px, 0)`
+      }
+    }
 
-    let animationId = 0
-    let frameCount = 0
-    let obstacles = getObstacleRects()
+    let frameId = 0
+    let bounds = layer.getBoundingClientRect()
+    let physics = createInitialBubbles(countdowns, bounds.width, bounds.height)
+    applyBubbleStyles(physics)
+
+    if (supportsReducedMotion()) {
+      layer.classList.add('countdown-bubble-layer--reduced')
+      return () => {
+        layer.classList.remove('countdown-bubble-layer--reduced')
+      }
+    }
 
     const tick = () => {
-      frameCount += 1
-      if (frameCount % 20 === 0) {
-        obstacles = getObstacleRects()
-      }
-
-      const maxX = window.innerWidth - BUBBLE_WIDTH
-      const maxY = window.innerHeight - BUBBLE_HEIGHT
+      bounds = layer.getBoundingClientRect()
+      const maxX = Math.max(MIN_GAP, bounds.width)
+      const maxY = Math.max(MIN_GAP, bounds.height)
 
       for (const bubble of physics) {
-        bubble.x += bubble.vx
-        bubble.y += bubble.vy
+        if (!pausedIdsRef.current.has(bubble.id)) {
+          bubble.x += bubble.vx
+          bubble.y += bubble.vy
+        }
 
         if (bubble.x <= MIN_GAP) {
           bubble.x = MIN_GAP
           bubble.vx = Math.abs(bubble.vx)
-        } else if (bubble.x >= maxX - MIN_GAP) {
-          bubble.x = maxX - MIN_GAP
+        } else if (bubble.x + bubble.size >= maxX - MIN_GAP) {
+          bubble.x = maxX - bubble.size - MIN_GAP
           bubble.vx = -Math.abs(bubble.vx)
         }
 
         if (bubble.y <= MIN_GAP) {
           bubble.y = MIN_GAP
           bubble.vy = Math.abs(bubble.vy)
-        } else if (bubble.y >= maxY - MIN_GAP) {
-          bubble.y = maxY - MIN_GAP
+        } else if (bubble.y + bubble.size >= maxY - MIN_GAP) {
+          bubble.y = maxY - bubble.size - MIN_GAP
           bubble.vy = -Math.abs(bubble.vy)
-        }
-
-        for (const rect of obstacles) {
-          resolveObstacleCollision(bubble, rect, OBSTACLE_PADDING)
         }
       }
 
       separateBubbles(physics)
-      setBubbles(physics.map((bubble) => ({ ...bubble })))
-      animationId = window.requestAnimationFrame(tick)
+      applyBubbleStyles(physics)
+      frameId = window.requestAnimationFrame(tick)
     }
 
-    setBubbles(physics)
-    animationId = window.requestAnimationFrame(tick)
-
     const handleResize = () => {
-      obstacles = getObstacleRects()
+      bounds = layer.getBoundingClientRect()
+      physics = createInitialBubbles(countdowns, bounds.width, bounds.height)
+      applyBubbleStyles(physics)
     }
 
     window.addEventListener('resize', handleResize)
-    window.addEventListener('scroll', handleResize, true)
+    frameId = window.requestAnimationFrame(tick)
 
     return () => {
-      window.cancelAnimationFrame(animationId)
+      window.cancelAnimationFrame(frameId)
       window.removeEventListener('resize', handleResize)
-      window.removeEventListener('scroll', handleResize, true)
     }
   }, [countdowns])
 
@@ -298,23 +275,31 @@ export default function CountdownBubbleLayer({
   }
 
   return (
-    <div className="countdown-bubble-layer" aria-label="倒计时气泡提醒">
-      {bubbles.map((bubble) => (
+    <div
+      ref={layerRef}
+      className="countdown-bubble-layer"
+      aria-label="专注模式倒计时气泡"
+    >
+      {countdowns.map((item) => (
         <button
-          key={bubble.id}
-          type="button"
-          className="countdown-bubble"
-          style={{
-            transform: `translate(${bubble.x}px, ${bubble.y}px)`,
+          key={item.id}
+          ref={(element) => {
+            bubbleRefs.current[item.id] = element
           }}
-          onClick={() => speakCountdown(bubble.title, bubble.targetDate)}
-          title={`${bubble.title} · 点击语音播报`}
+          type="button"
+          className={`countdown-bubble ${getUrgencyClass(item.targetDate)}`}
+          onMouseEnter={() => pausedIdsRef.current.add(item.id)}
+          onMouseLeave={() => pausedIdsRef.current.delete(item.id)}
+          onFocus={() => pausedIdsRef.current.add(item.id)}
+          onBlur={() => pausedIdsRef.current.delete(item.id)}
+          onClick={() => speakCountdown(item.title, item.targetDate)}
+          title={`${item.title} · 点击语音播报`}
         >
           <span className="countdown-bubble-inner">
+            <span className="countdown-bubble-title">{item.title}</span>
             <span className="countdown-bubble-days">
-              {formatCountdownLabel(bubble.targetDate)}
+              {formatCountdownLabel(item.targetDate)}
             </span>
-            <span className="countdown-bubble-title">{bubble.title}</span>
           </span>
         </button>
       ))}

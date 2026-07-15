@@ -3,9 +3,9 @@ import AmbientBackground from './components/AmbientBackground.tsx'
 import CalendarView from './components/CalendarView.tsx'
 import CategoryPanel from './components/CategoryPanel.tsx'
 import CommandPalette from './components/command/CommandPalette.tsx'
-import CountdownBubbleLayer from './components/CountdownBubbleLayer.tsx'
 import CountdownPanel from './components/CountdownPanel.tsx'
 import DayDetailModal from './components/DayDetailModal.tsx'
+import FocusMode from './components/focus/FocusMode.tsx'
 import VoiceControl, {
   type VoiceExternalCommand,
   type VoiceRuntimeStatus,
@@ -62,6 +62,7 @@ function App() {
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('today')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
+  const [isFocusMode, setIsFocusMode] = useState(false)
   const [voiceListenSignal, setVoiceListenSignal] = useState(0)
   const [voiceTextCommand, setVoiceTextCommand] = useState<VoiceExternalCommand | null>(null)
   const [voiceStatus, setVoiceStatus] = useState<VoiceRuntimeStatus>(DEFAULT_VOICE_STATUS)
@@ -209,8 +210,6 @@ function App() {
     <>
       <AmbientBackground />
       <main className="app">
-        <CountdownBubbleLayer refreshVersion={countdownVersion} />
-
         <AppShell
           sidebar={
             <Sidebar
@@ -252,7 +251,10 @@ function App() {
                 textCommand={voiceTextCommand}
                 onRuntimeChange={setVoiceStatus}
               />
-              <CountdownPanel onCountdownChange={handleCountdownChange} />
+              <CountdownPanel
+                onCountdownChange={handleCountdownChange}
+                onEnterFocusMode={() => setIsFocusMode(true)}
+              />
               <CategoryPanel
                 eventsVersion={eventsVersion}
                 onCategoriesChange={handleCategoriesChange}
@@ -283,8 +285,15 @@ function App() {
         <VoiceOrb
           status={voiceStatus}
           onToggleListening={handleToggleVoiceInput}
-          isHidden={isDayDetailOpen || isCommandPaletteOpen}
+          isHidden={isDayDetailOpen || isCommandPaletteOpen || isFocusMode}
         />
+
+        {isFocusMode && (
+          <FocusMode
+            countdownRefreshVersion={countdownVersion}
+            onExit={() => setIsFocusMode(false)}
+          />
+        )}
 
         {isCommandPaletteOpen && (
           <CommandPalette
