@@ -4,7 +4,9 @@ export type WorkspaceId = 'today' | 'calendar' | 'tasks' | 'insights' | 'setting
 
 type SidebarProps = {
   activeWorkspace: WorkspaceId
+  selectedCategoryId?: string | null
   onNavigate: (workspace: WorkspaceId) => void
+  onSelectCategory?: (categoryId: string | null) => void
 }
 
 const NAV_ITEMS: Array<{ id: WorkspaceId; label: string; eyebrow: string }> = [
@@ -17,7 +19,9 @@ const NAV_ITEMS: Array<{ id: WorkspaceId; label: string; eyebrow: string }> = [
 
 export default function Sidebar({
   activeWorkspace,
+  selectedCategoryId = null,
   onNavigate,
+  onSelectCategory,
 }: SidebarProps) {
   const categories = getCategories()
 
@@ -55,18 +59,38 @@ export default function Sidebar({
           <span>Categories</span>
           <small>{categories.length}</small>
         </div>
-        <div className="app-sidebar-category-list">
+        <nav className="app-sidebar-category-list" aria-label="Category filters">
+          <button
+            type="button"
+            className={`app-sidebar-category${
+              selectedCategoryId === null ? ' app-sidebar-category--active' : ''
+            }`}
+            aria-pressed={selectedCategoryId === null}
+            onClick={() => onSelectCategory?.(null)}
+          >
+            <span className="category-mark" aria-hidden />
+            <span className="app-sidebar-category-name">全部分类</span>
+          </button>
+
           {categories.length === 0 ? (
             <p className="app-sidebar-empty">No categories yet</p>
           ) : (
             categories.slice(0, 8).map((category) => (
-              <span key={category.id} className="app-sidebar-category">
-                <span aria-hidden />
-                {category.name}
-              </span>
+              <button
+                key={category.id}
+                type="button"
+                className={`app-sidebar-category${
+                  selectedCategoryId === category.id ? ' app-sidebar-category--active' : ''
+                }`}
+                aria-pressed={selectedCategoryId === category.id}
+                onClick={() => onSelectCategory?.(category.id)}
+              >
+                <span className="category-mark" aria-hidden />
+                <span className="app-sidebar-category-name">{category.name}</span>
+              </button>
             ))
           )}
-        </div>
+        </nav>
       </section>
     </aside>
   )
