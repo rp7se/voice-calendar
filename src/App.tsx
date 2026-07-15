@@ -10,20 +10,19 @@ import AppShell from './components/layout/AppShell.tsx'
 import ContextPanel from './components/layout/ContextPanel.tsx'
 import Sidebar, { type WorkspaceId } from './components/layout/Sidebar.tsx'
 import Topbar from './components/layout/Topbar.tsx'
+import NextEvent from './components/today/NextEvent.tsx'
+import TodayOverview from './components/today/TodayOverview.tsx'
+import TodayWorkspace from './components/today/TodayWorkspace.tsx'
 import { formatDate } from './utils/date.ts'
 import './App.css'
 
 const WORKSPACE_PLACEHOLDERS: Record<
-  Exclude<WorkspaceId, 'calendar'>,
+  Exclude<WorkspaceId, 'today' | 'calendar'>,
   {
     title: string
     description: string
   }
 > = {
-  today: {
-    title: 'Today Workspace',
-    description: 'Today 将在后续 PR 中扩展为今日概览；当前 PR 只建立工作区入口。',
-  },
   tasks: {
     title: 'Tasks Workspace',
     description: 'Tasks 将在后续 PR 中实现任务视图；当前先保留导航位置。',
@@ -44,7 +43,7 @@ function App() {
   const [categoriesVersion, setCategoriesVersion] = useState(0)
   const [countdownVersion, setCountdownVersion] = useState(0)
   const [isDayDetailOpen, setIsDayDetailOpen] = useState(false)
-  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('calendar')
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('today')
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(formatDate(date))
@@ -64,6 +63,10 @@ function App() {
   }
 
   const renderWorkspace = () => {
+    if (activeWorkspace === 'today') {
+      return <TodayWorkspace onOpenCalendar={() => setActiveWorkspace('calendar')} />
+    }
+
     if (activeWorkspace !== 'calendar') {
       const placeholder = WORKSPACE_PLACEHOLDERS[activeWorkspace]
       return (
@@ -108,13 +111,18 @@ function App() {
           sidebar={
             <Sidebar
               activeWorkspace={activeWorkspace}
-              categoriesVersion={categoriesVersion}
               onNavigate={setActiveWorkspace}
             />
           }
           topbar={<Topbar activeWorkspace={activeWorkspace} selectedDate={selectedDate} />}
           contextPanel={
             <ContextPanel>
+              {activeWorkspace === 'today' && (
+                <div className="today-context-stack">
+                  <NextEvent />
+                  <TodayOverview />
+                </div>
+              )}
               <VoiceControl
                 onCalendarChange={handleEventsChange}
                 onCategoryChange={handleCategoriesChange}
