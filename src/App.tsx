@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import AmbientBackground from './components/AmbientBackground.tsx'
 import CalendarView from './components/CalendarView.tsx'
 import CategoryPanel from './components/CategoryPanel.tsx'
 import CountdownBubbleLayer from './components/CountdownBubbleLayer.tsx'
@@ -33,7 +34,9 @@ function App() {
   }
 
   return (
-    <main className="app">
+    <>
+      <AmbientBackground />
+      <main className="app">
       <CountdownBubbleLayer refreshVersion={countdownVersion} />
 
       <header className="app-header">
@@ -77,7 +80,8 @@ function App() {
           </section>
         </aside>
       </div>
-    </main>
+      </main>
+    </>
   )
 }
 
