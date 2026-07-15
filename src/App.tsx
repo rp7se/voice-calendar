@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AmbientBackground from './components/AmbientBackground.tsx'
 import CalendarView from './components/CalendarView.tsx'
 import CategoryPanel from './components/CategoryPanel.tsx'
+import CommandPalette from './components/command/CommandPalette.tsx'
 import CountdownBubbleLayer from './components/CountdownBubbleLayer.tsx'
 import CountdownPanel from './components/CountdownPanel.tsx'
 import DayDetailModal from './components/DayDetailModal.tsx'
-import VoiceControl from './components/VoiceControl.tsx'
+import VoiceControl, {
+  type VoiceExternalCommand,
+  type VoiceRuntimeStatus,
+} from './components/VoiceControl.tsx'
 import AppShell from './components/layout/AppShell.tsx'
 import ContextPanel from './components/layout/ContextPanel.tsx'
 import Sidebar, { type WorkspaceId } from './components/layout/Sidebar.tsx'
@@ -16,6 +20,7 @@ import { filterTasksByCategory } from './components/tasks/taskUtils.ts'
 import NextEvent from './components/today/NextEvent.tsx'
 import TodayOverview from './components/today/TodayOverview.tsx'
 import TodayWorkspace from './components/today/TodayWorkspace.tsx'
+import VoiceOrb from './components/voice/VoiceOrb.tsx'
 import { formatDate } from './utils/date.ts'
 import { getCategories } from './utils/storage.ts'
 import { getTasks } from './utils/taskStorage.ts'
@@ -38,6 +43,15 @@ const WORKSPACE_PLACEHOLDERS: Record<
   },
 }
 
+const DEFAULT_VOICE_STATUS: VoiceRuntimeStatus = {
+  phase: 'idle',
+  transcript: '',
+  isListening: false,
+  isSupported: true,
+  wakeWordEnabled: false,
+  error: null,
+}
+
 function App() {
   const [selectedDate, setSelectedDate] = useState(() => formatDate(new Date()))
   const [eventsVersion, setEventsVersion] = useState(0)
@@ -47,6 +61,11 @@ function App() {
   const [isDayDetailOpen, setIsDayDetailOpen] = useState(false)
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('today')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
+  const [voiceListenSignal, setVoiceListenSignal] = useState(0)
+  const [voiceTextCommand, setVoiceTextCommand] = useState<VoiceExternalCommand | null>(null)
+  const [voiceStatus, setVoiceStatus] = useState<VoiceRuntimeStatus>(DEFAULT_VOICE_STATUS)
+  const [createTaskSignal, setCreateTaskSignal] = useState(0)
 
   const selectedCategory =
     getCategories().find((category) => category.id === selectedCategoryId) ?? null
@@ -75,6 +94,50 @@ function App() {
     setTaskVersion((version) => version + 1)
   }
 
+  const handleToggleVoiceInput = () => {
+    setVoiceListenSignal((signal) => signal + 1)
+  }
+
+  const handleRunTextCommand = (text: string) => {
+    const commandText = text.trim()
+    if (!commandText) {
+      return
+    }
+
+    setVoiceTextCommand((command) => ({
+      id: (command?.id ?? 0) + 1,
+      text: commandText,
+    }))
+  }
+
+  const handleOpenNewEvent = () => {
+    setActiveWorkspace('calendar')
+    setIsDayDetailOpen(true)
+  }
+
+  const handleOpenNewTask = () => {
+    setActiveWorkspace('tasks')
+    setCreateTaskSignal((signal) => signal + 1)
+  }
+
+  const handleOpenEventDate = (date: string) => {
+    setSelectedDate(date)
+    setActiveWorkspace('calendar')
+    setIsDayDetailOpen(true)
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'k') {
+        event.preventDefault()
+        setIsCommandPaletteOpen(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   const renderWorkspace = () => {
     if (activeWorkspace === 'today') {
       return (
@@ -93,6 +156,7 @@ function App() {
         <TasksWorkspace
           selectedCategoryId={selectedCategoryId}
           selectedCategoryName={selectedCategory?.name ?? null}
+          createTaskSignal={createTaskSignal}
           onTasksChange={handleTasksChange}
         />
       )
@@ -156,7 +220,13 @@ function App() {
               onSelectCategory={setSelectedCategoryId}
             />
           }
-          topbar={<Topbar activeWorkspace={activeWorkspace} selectedDate={selectedDate} />}
+          topbar={
+            <Topbar
+              activeWorkspace={activeWorkspace}
+              selectedDate={selectedDate}
+              onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+            />
+          }
           contextPanel={
             <ContextPanel
               eyebrow={activeWorkspace === 'tasks' ? 'Tasks Context' : 'Context'}
@@ -178,6 +248,9 @@ function App() {
               <VoiceControl
                 onCalendarChange={handleEventsChange}
                 onCategoryChange={handleCategoriesChange}
+                listenSignal={voiceListenSignal}
+                textCommand={voiceTextCommand}
+                onRuntimeChange={setVoiceStatus}
               />
               <CountdownPanel onCountdownChange={handleCountdownChange} />
               <CategoryPanel
@@ -206,6 +279,29 @@ function App() {
           onEventsChange={handleEventsChange}
           categoriesVersion={categoriesVersion}
         />
+
+        <VoiceOrb
+          status={voiceStatus}
+          onToggleListening={handleToggleVoiceInput}
+          isHidden={isDayDetailOpen || isCommandPaletteOpen}
+        />
+
+        {isCommandPaletteOpen && (
+          <CommandPalette
+            isOpen={isCommandPaletteOpen}
+            activeWorkspace={activeWorkspace}
+            voiceStatus={voiceStatus}
+            onClose={() => setIsCommandPaletteOpen(false)}
+            onNavigate={setActiveWorkspace}
+            onOpenNewEvent={handleOpenNewEvent}
+            onOpenNewTask={handleOpenNewTask}
+            onStartVoice={handleToggleVoiceInput}
+            onRunTextCommand={handleRunTextCommand}
+            onSelectCategory={setSelectedCategoryId}
+            onOpenEventDate={handleOpenEventDate}
+            onOpenTask={() => setActiveWorkspace('tasks')}
+          />
+        )}
       </main>
     </>
   )

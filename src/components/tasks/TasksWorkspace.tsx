@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { EventCategory } from '../../types/calendar.ts'
 import type { Task, TaskInput } from '../../types/task.ts'
 import { getCategories } from '../../utils/storage.ts'
@@ -15,6 +15,7 @@ import {
 type TasksWorkspaceProps = {
   selectedCategoryId?: string | null
   selectedCategoryName?: string | null
+  createTaskSignal?: number
   onTasksChange?: () => void
 }
 
@@ -27,12 +28,14 @@ const TASK_TABS: Array<{ id: TaskTab; label: string }> = [
 export default function TasksWorkspace({
   selectedCategoryId = null,
   selectedCategoryName = null,
+  createTaskSignal = 0,
   onTasksChange,
 }: TasksWorkspaceProps) {
   const [tasks, setTasks] = useState(() => getTasks())
   const [activeTab, setActiveTab] = useState<TaskTab>('today')
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
+  const lastCreateTaskSignalRef = useRef(createTaskSignal)
 
   const categories: EventCategory[] = getCategories()
 
@@ -50,6 +53,16 @@ export default function TasksWorkspace({
     setEditingTask(null)
     setIsEditorOpen(true)
   }
+
+  useEffect(() => {
+    if (createTaskSignal === lastCreateTaskSignalRef.current) {
+      return
+    }
+
+    lastCreateTaskSignalRef.current = createTaskSignal
+    setEditingTask(null)
+    setIsEditorOpen(true)
+  }, [createTaskSignal])
 
   const openEditTask = (task: Task) => {
     setEditingTask(task)
