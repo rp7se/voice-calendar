@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition.ts'
 import type { ScheduleSummary } from '../utils/scheduleSummary.ts'
 import { getDaysBetweenToday } from '../utils/date.ts'
@@ -17,12 +17,32 @@ import { parseVoiceCommand } from '../utils/voiceCommandParser.ts'
 type VoiceControlProps = {
   onCalendarChange?: () => void
   onCategoryChange?: () => void
+  listenSignal?: number
+  textCommand?: VoiceExternalCommand | null
+  onRuntimeChange?: (status: VoiceRuntimeStatus) => void
 }
 
 type ExecutionFeedback = {
   title: string
   message: string
   summary?: ScheduleSummary
+}
+
+export type VoiceRuntimePhase = 'idle' | 'listening' | 'processing' | 'speaking' | 'error'
+
+export type VoiceRuntimeStatus = {
+  phase: VoiceRuntimePhase
+  transcript: string
+  isListening: boolean
+  isSupported: boolean
+  wakeWordEnabled: boolean
+  error: string | null
+  feedbackTitle?: string
+}
+
+export type VoiceExternalCommand = {
+  id: number
+  text: string
 }
 
 const WAKE_WORD = '小历小历'
@@ -52,8 +72,9 @@ const ASSISTANT_SUGGESTIONS: Record<string, string> = {
   生日: '建议提前准备祝福或礼物。',
 }
 
-function speak(text: string) {
+function speak(text: string, onStart?: () => void, onEnd?: () => void) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    onEnd?.()
     return
   }
 
@@ -62,6 +83,9 @@ function speak(text: string) {
   utterance.lang = 'zh-CN'
   utterance.rate = 1
   utterance.pitch = 1
+  utterance.onstart = () => onStart?.()
+  utterance.onend = () => onEnd?.()
+  utterance.onerror = () => onEnd?.()
   window.speechSynthesis.speak(utterance)
 }
 
@@ -120,6 +144,9 @@ function formatCountdownResult(title: string, targetDate: string): string {
 export default function VoiceControl({
   onCalendarChange,
   onCategoryChange,
+  listenSignal = 0,
+  textCommand = null,
+  onRuntimeChange,
 }: VoiceControlProps) {
   const {
     transcript,
@@ -131,11 +158,21 @@ export default function VoiceControl({
   } = useSpeechRecognition()
   const [feedback, setFeedback] = useState<ExecutionFeedback | null>(null)
   const [wakeWordEnabled, setWakeWordEnabled] = useState(false)
+  const [runtimePhase, setRuntimePhase] = useState<VoiceRuntimePhase>('idle')
   const lastExecutedRef = useRef('')
+  const lastListenSignalRef = useRef(listenSignal)
+  const lastTextCommandIdRef = useRef(textCommand?.id ?? 0)
+  const executeCommandRef = useRef<(text: string) => void>(() => undefined)
+  const toggleListeningRef = useRef<() => void>(() => undefined)
 
   const setAndSpeak = (nextFeedback: ExecutionFeedback) => {
     setFeedback(nextFeedback)
-    speak(nextFeedback.message)
+    setRuntimePhase('processing')
+    speak(
+      nextFeedback.message,
+      () => setRuntimePhase('speaking'),
+      () => setRuntimePhase('idle'),
+    )
   }
 
   const normalizeCommandText = (text: string): string | null => {
@@ -315,9 +352,59 @@ export default function VoiceControl({
     }
 
     setFeedback(null)
+    setRuntimePhase('idle')
     lastExecutedRef.current = ''
     startListening()
   }
+
+  useEffect(() => {
+    executeCommandRef.current = handleExecuteCommand
+    toggleListeningRef.current = handleToggleListening
+  })
+
+  const runtimeStatus = useMemo<VoiceRuntimeStatus>(() => {
+    const phase: VoiceRuntimePhase = error
+      ? 'error'
+      : isListening
+        ? 'listening'
+        : runtimePhase
+
+    return {
+      phase,
+      transcript,
+      isListening,
+      isSupported,
+      wakeWordEnabled,
+      error,
+      feedbackTitle: feedback?.title,
+    }
+  }, [error, feedback?.title, isListening, isSupported, runtimePhase, transcript, wakeWordEnabled])
+
+  useEffect(() => {
+    onRuntimeChange?.(runtimeStatus)
+  }, [onRuntimeChange, runtimeStatus])
+
+  useEffect(() => {
+    if (listenSignal === lastListenSignalRef.current) {
+      return
+    }
+
+    lastListenSignalRef.current = listenSignal
+    toggleListeningRef.current()
+  }, [listenSignal])
+
+  useEffect(() => {
+    if (!textCommand || textCommand.id === lastTextCommandIdRef.current) {
+      return
+    }
+
+    lastTextCommandIdRef.current = textCommand.id
+    if (isListening) {
+      stopListening()
+    }
+    lastExecutedRef.current = textCommand.text.trim()
+    executeCommandRef.current(textCommand.text)
+  }, [isListening, stopListening, textCommand])
 
   useEffect(() => {
     const text = transcript.trim()
@@ -326,14 +413,13 @@ export default function VoiceControl({
     }
 
     lastExecutedRef.current = text
-    handleExecuteCommand(text)
+    executeCommandRef.current(text)
   }, [isListening, transcript, wakeWordEnabled])
 
   return (
     <section className="voice-control" aria-label="语音输入">
       <div className="voice-control-header">
-        <h2 className="section-title">语音输入</h2>
-        <p className="voice-control-desc">点击按钮开始说话，识别结果和执行反馈会显示在下方</p>
+        <h2 className="section-title">语音状态</h2>
       </div>
 
       {!isSupported ? (
@@ -344,8 +430,7 @@ export default function VoiceControl({
         <>
           <div className="wake-word-setting">
             <div className="wake-word-copy">
-              <strong>唤醒词模式</strong>
-              <span>开启后请先说：{WAKE_WORD}</span>
+              <strong>{wakeWordEnabled ? '唤醒词已开启' : '唤醒词未开启'}</strong>
             </div>
             <button
               type="button"
@@ -377,16 +462,18 @@ export default function VoiceControl({
 
           {error && <p className="voice-control-error voice-error">{error}</p>}
 
-          <div className="voice-control-result voice-result">
-            <span className="voice-control-result-label">识别结果</span>
-            <p className="voice-control-transcript">
-              {transcript || (isListening ? '请开始说话...' : '暂无识别内容')}
-            </p>
-          </div>
+          {(isListening || transcript) && (
+            <div className="voice-control-result voice-result">
+              <span className="voice-control-result-label">识别结果</span>
+              <p className="voice-control-transcript">
+                {transcript || (isListening ? '正在聆听' : '')}
+              </p>
+            </div>
+          )}
 
-          <div className="voice-control-feedback voice-command-result" aria-live="polite">
-            <span className="voice-control-result-label">执行反馈</span>
-            {feedback ? (
+          {feedback && (
+            <div className="voice-control-feedback voice-command-result" aria-live="polite">
+              <span className="voice-control-result-label">执行反馈</span>
               <article className="voice-feedback-card">
                 <h3>{feedback.title}</h3>
                 {feedback.summary ? (
@@ -426,10 +513,8 @@ export default function VoiceControl({
                   <p>{feedback.message}</p>
                 )}
               </article>
-            ) : (
-              <p className="voice-control-feedback-empty">等待语音指令执行。</p>
-            )}
-          </div>
+            </div>
+          )}
         </>
       )}
     </section>
