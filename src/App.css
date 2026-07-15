@@ -2177,7 +2177,20 @@
 }
 
 .countdown-panel-header {
-  margin-bottom: var(--space-5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.countdown-panel-header span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .countdown-form,
@@ -2204,8 +2217,8 @@
 
 .countdown-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
 }
 
 .countdown-empty {
@@ -2214,11 +2227,12 @@
 }
 
 .countdown-card {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  border-radius: var(--radius-lg);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
   transition:
     transform var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),
@@ -2247,26 +2261,32 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: var(--space-1);
-}
-
-.countdown-card-emoji {
-  color: var(--color-accent);
-  font-size: 19px;
-  line-height: 1;
+  gap: 2px;
 }
 
 .countdown-card-title {
-  margin: var(--space-1) 0 0;
+  margin: 0;
+  overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 16px;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countdown-card-date,
+.countdown-card-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .countdown-card-remaining {
-  margin-top: var(--space-2);
+  margin: 0;
   color: var(--color-accent-hover);
-  font-size: 15px;
+  font-family: var(--mono);
+  font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .countdown-card--today .countdown-card-remaining {
@@ -2297,48 +2317,93 @@
   color: var(--color-danger-ink);
 }
 
+.countdown-focus-btn {
+  min-height: 34px;
+  flex-shrink: 0;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard);
+}
+
+.countdown-focus-btn:hover {
+  border-color: var(--color-accent-hover);
+  background: var(--color-accent-hover-soft);
+}
+
+.countdown-focus-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .countdown-bubble-layer {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: var(--z-floating);
   overflow: hidden;
   pointer-events: none;
 }
 
 .countdown-bubble {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 104px;
-  height: 104px;
   padding: 0;
   border: 1px solid var(--color-accent-border);
   border-radius: 50%;
-  background: var(--color-bg-elevated);
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.16), transparent 34%),
+    rgba(10, 11, 16, 0.78);
   color: var(--color-text-primary);
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(14px);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.52),
+    inset 0 0 22px rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
   cursor: pointer;
   pointer-events: auto;
-  opacity: 0.9;
+  opacity: 0.92;
   transition:
     opacity var(--duration-normal) var(--ease-standard),
-    transform var(--duration-normal) var(--ease-standard),
+    border-color var(--duration-normal) var(--ease-standard),
     box-shadow var(--duration-normal) var(--ease-standard);
   will-change: transform;
 }
 
 .countdown-bubble:hover {
   opacity: 1;
-  box-shadow: var(--shadow-lg);
+  border-color: var(--color-border-strong);
+  box-shadow:
+    0 22px 64px rgba(0, 0, 0, 0.6),
+    inset 0 0 26px rgba(255, 255, 255, 0.06);
+}
+
+.countdown-bubble--today,
+.countdown-bubble--soon {
+  border-color: var(--color-warning-border);
+}
+
+.countdown-bubble--past {
+  opacity: 0.62;
+}
+
+.countdown-bubble-layer--reduced .countdown-bubble {
+  transition: none;
 }
 
 .countdown-bubble-inner {
   display: flex;
-  width: 84px;
+  width: 76%;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -2349,8 +2414,9 @@
 
 .countdown-bubble-days {
   color: var(--color-accent-ink);
-  font-size: 14px;
-  font-weight: 750;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 800;
   line-height: 1.2;
 }
 
@@ -2358,7 +2424,8 @@
   display: -webkit-box;
   overflow: hidden;
   color: var(--color-text-secondary);
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 750;
   line-height: 1.25;
   word-break: break-all;
   -webkit-box-orient: vertical;
@@ -2932,6 +2999,107 @@
   text-align: center;
 }
 
+.focus-mode {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-drawer);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: max(var(--space-5), env(safe-area-inset-top))
+    max(var(--space-5), env(safe-area-inset-right))
+    max(var(--space-5), env(safe-area-inset-bottom))
+    max(var(--space-5), env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.055), transparent 32%),
+    rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(6px);
+}
+
+.focus-mode::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 28%, rgba(0, 0, 0, 0.34)),
+    radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.04), transparent 30%);
+  pointer-events: none;
+}
+
+.focus-mode-header {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 72px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: rgba(4, 5, 8, 0.62);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px);
+}
+
+.focus-mode-header span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.focus-mode-header strong {
+  color: var(--color-text-primary);
+}
+
+.focus-mode-time {
+  min-width: 118px;
+  text-align: right;
+}
+
+.focus-mode-time strong {
+  display: block;
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.focus-mode-exit {
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-muted);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard);
+}
+
+.focus-mode-exit:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-muted-hover);
+}
+
+.focus-mode-bubble-area {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  margin-top: var(--space-4);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(circle at 42% 44%, rgba(255, 255, 255, 0.028), transparent 42%),
+    rgba(0, 0, 0, 0.08);
+}
+
 .context-panel .voice-control {
   padding: var(--space-3);
 }
@@ -3447,6 +3615,23 @@
     gap: var(--space-1);
     padding: var(--space-3);
   }
+
+  .focus-mode {
+    padding: var(--space-3);
+  }
+
+  .focus-mode-header {
+    grid-template-columns: 1fr auto;
+    gap: var(--space-3);
+  }
+
+  .focus-mode-time {
+    display: none;
+  }
+
+  .focus-mode-exit {
+    padding: 0 var(--space-3);
+  }
 }
 
 @media (max-width: 1100px) {
@@ -3568,7 +3753,9 @@
   .day-detail-modal-event,
   .event-card,
   .category-date-card {
+    display: flex;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .countdown-delete-btn,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import CompletionFeedbackModal from './CompletionFeedbackModal.tsx'
 import type { CountdownItem } from '../types/calendar.ts'
 import { addCountdown, getCountdowns } from '../utils/storage.ts'
@@ -12,6 +12,7 @@ const EMPTY_FORM = {
 
 type CountdownPanelProps = {
   onCountdownChange?: () => void
+  onEnterFocusMode?: () => void
 }
 
 function getCountdownStatus(targetDate: string): 'today' | 'future' | 'past' | 'invalid' {
@@ -28,18 +29,17 @@ function getCountdownStatus(targetDate: string): 'today' | 'future' | 'past' | '
   return 'past'
 }
 
-export default function CountdownPanel({ onCountdownChange }: CountdownPanelProps) {
-  const [countdowns, setCountdowns] = useState<CountdownItem[]>([])
+export default function CountdownPanel({
+  onCountdownChange,
+  onEnterFocusMode,
+}: CountdownPanelProps) {
+  const [countdowns, setCountdowns] = useState<CountdownItem[]>(() => getCountdowns())
   const [form, setForm] = useState(EMPTY_FORM)
   const [pendingDelete, setPendingDelete] = useState<CountdownItem | null>(null)
 
   const refreshCountdowns = () => {
     setCountdowns(getCountdowns())
   }
-
-  useEffect(() => {
-    refreshCountdowns()
-  }, [])
 
   const sortedCountdowns = useMemo(() => {
     return [...countdowns].sort((a, b) => a.targetDate.localeCompare(b.targetDate))
@@ -84,8 +84,18 @@ export default function CountdownPanel({ onCountdownChange }: CountdownPanelProp
       />
 
       <header className="countdown-panel-header">
-        <h2 className="section-title">⏳ 重要事项倒计时</h2>
-        <p>记录考试、比赛、面试等重要日期</p>
+        <div>
+          <span>Countdown</span>
+          <h2 className="section-title">重要目标</h2>
+        </div>
+        <button
+          type="button"
+          className="countdown-focus-btn"
+          onClick={onEnterFocusMode}
+          disabled={sortedCountdowns.length === 0}
+        >
+          进入专注模式
+        </button>
       </header>
 
       <form className="countdown-form" onSubmit={handleSubmit}>
@@ -128,7 +138,7 @@ export default function CountdownPanel({ onCountdownChange }: CountdownPanelProp
 
       <div className="countdown-list">
         {sortedCountdowns.length === 0 ? (
-          <p className="countdown-empty">暂无倒计时，可在上方添加</p>
+          <p className="countdown-empty">还没有倒计时目标。添加一个值得期待的目标。</p>
         ) : (
           sortedCountdowns.map((item) => {
             const status = getCountdownStatus(item.targetDate)
@@ -138,18 +148,15 @@ export default function CountdownPanel({ onCountdownChange }: CountdownPanelProp
                 className={`countdown-card countdown-card--${status}`}
               >
                 <div className="countdown-card-body">
-                  <span className="countdown-card-emoji" aria-hidden>
-                    {status === 'today' ? '🎯' : status === 'future' ? '⏳' : '📌'}
-                  </span>
                   <h4 className="countdown-card-title">{item.title}</h4>
                   <p className="countdown-card-date">{item.targetDate}</p>
                   {item.description && (
                     <p className="countdown-card-desc">{item.description}</p>
                   )}
-                  <p className="countdown-card-remaining">
-                    {formatCountdownLabel(item.targetDate)}
-                  </p>
                 </div>
+                <p className="countdown-card-remaining">
+                  {formatCountdownLabel(item.targetDate)}
+                </p>
                 <button
                   type="button"
                   className="countdown-delete-btn"
