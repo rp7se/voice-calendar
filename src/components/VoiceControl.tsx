@@ -157,7 +157,7 @@ export default function VoiceControl({
     stopListening,
   } = useSpeechRecognition()
   const [feedback, setFeedback] = useState<ExecutionFeedback | null>(null)
-  const [wakeWordEnabled, setWakeWordEnabled] = useState(false)
+  const [wakeWordEnabled] = useState(false)
   const [runtimePhase, setRuntimePhase] = useState<VoiceRuntimePhase>('idle')
   const lastExecutedRef = useRef('')
   const lastListenSignalRef = useRef(listenSignal)
@@ -428,20 +428,6 @@ export default function VoiceControl({
         </p>
       ) : (
         <>
-          <div className="wake-word-setting">
-            <div className="wake-word-copy">
-              <strong>{wakeWordEnabled ? '唤醒词已开启' : '唤醒词未开启'}</strong>
-            </div>
-            <button
-              type="button"
-              className={`wake-word-toggle${wakeWordEnabled ? ' wake-word-toggle--active' : ''}`}
-              aria-pressed={wakeWordEnabled}
-              onClick={() => setWakeWordEnabled((enabled) => !enabled)}
-            >
-              {wakeWordEnabled ? '已开启' : '已关闭'}
-            </button>
-          </div>
-
           <div className="voice-actions">
             <button
               type="button"
