@@ -101,7 +101,7 @@ function toCalendarEvent(dto: BackendEventDto): CalendarEvent {
   return { ...dto }
 }
 
-function toWriteRequest(event: CalendarEventInput): EventWriteRequest {
+export function toEventWriteRequest(event: CalendarEventInput): EventWriteRequest {
   return {
     title: event.title,
     description: event.description,
@@ -176,7 +176,7 @@ export async function createEvent(event: CalendarEventInput): Promise<CalendarEv
   const value = await requestJson(EVENTS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(toWriteRequest(event)),
+    body: JSON.stringify(toEventWriteRequest(event)),
   })
   return toCalendarEvent(parseBackendEvent(value))
 }
@@ -188,7 +188,7 @@ export async function updateEvent(
   const value = await requestJson(`${EVENTS_URL}/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(toWriteRequest(event)),
+    body: JSON.stringify(toEventWriteRequest(event)),
   })
   return toCalendarEvent(parseBackendEvent(value))
 }

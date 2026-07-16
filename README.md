@@ -161,8 +161,8 @@ npm install
 npm run dev
 ```
 
-默认使用现有 localStorage 日程数据。需要联调 C++ Backend 时，先启动 Backend，
-再复制 `.env.example` 为不提交 Git 的 `.env.local`，并设置：
+Event 默认使用 C++ Backend。启动前请先运行 Backend；如需覆盖开发环境配置，
+可复制 `.env.example` 为不提交 Git 的 `.env.local`：
 
 ```text
 VITE_API_BASE_URL=/api
@@ -197,7 +197,9 @@ npm run build
 * 分类与日期的关联关系
 
 backend 模式下只有 Event 通过 C++ API 保存到 SQLite；分类、倒计时和任务仍保持现有本地存储。
-两种 Event 数据源不会自动迁移或双写。
+首次升级时，旧版 `localStorage` Event 会在验证 Backend 可用后安全迁移到 SQLite。
+迁移成功后旧 Event 暂时保留为备份，但运行时只读写 Backend，不会双写。
+`VITE_EVENT_DATA_SOURCE=local` 仅保留用于开发调试或紧急回退。
 
 ## 开发过程说明
 

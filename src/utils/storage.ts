@@ -8,9 +8,11 @@ import type {
   EventCategoryInput,
 } from '../types/calendar.ts'
 
+export const LEGACY_EVENT_STORAGE_KEY = 'voice-calendar:events'
+
 /** localStorage key 统一管理 */
 const STORAGE_KEYS = {
-  EVENTS: 'voice-calendar:events',
+  EVENTS: LEGACY_EVENT_STORAGE_KEY,
   COUNTDOWNS: 'voice-calendar:countdowns',
   CATEGORIES: 'voice-calendar:categories',
   CATEGORY_DATE_LINKS: 'voice-calendar:category-date-links',
