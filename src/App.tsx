@@ -59,6 +59,8 @@ const DEFAULT_VOICE_STATUS: VoiceRuntimeStatus = {
 
 type EventLoadStatus = 'ready' | 'loading' | 'error'
 
+const EVENT_LOADING_MESSAGE = '正在检查并迁移旧日程...'
+
 function App() {
   const [selectedDate, setSelectedDate] = useState(() => formatDate(new Date()))
   const [, setEventsVersion] = useState(0)
@@ -261,7 +263,7 @@ function App() {
             role={eventLoadStatus === 'error' ? 'alert' : 'status'}
           >
             <span>
-              {eventLoadStatus === 'loading' ? '正在加载日程...' : eventLoadError}
+              {eventLoadStatus === 'loading' ? EVENT_LOADING_MESSAGE : eventLoadError}
             </span>
             {eventLoadStatus === 'error' && (
               <button

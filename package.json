@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:migration": "node scripts/test-event-migration.mjs",
+    "test:migration:integration": "node scripts/test-event-migration-integration.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

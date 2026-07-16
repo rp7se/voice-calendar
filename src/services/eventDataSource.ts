@@ -2,10 +2,13 @@ import {
   ApiError,
   createEvent as createBackendEvent,
   deleteEvent as deleteBackendEvent,
-  getEvents as getBackendEvents,
   updateEvent as updateBackendEvent,
 } from '../api/eventApi.ts'
 import type { CalendarEvent, CalendarEventInput } from '../types/calendar.ts'
+import {
+  EventMigrationError,
+  migrateLegacyEvents,
+} from '../migrations/eventMigration.ts'
 import {
   addEvent as addLocalEvent,
   deleteEvent as deleteLocalEvent,
@@ -16,7 +19,7 @@ import {
 export type EventDataSourceMode = 'local' | 'backend'
 
 export const EVENT_DATA_SOURCE: EventDataSourceMode =
-  import.meta.env.VITE_EVENT_DATA_SOURCE === 'backend' ? 'backend' : 'local'
+  import.meta.env.VITE_EVENT_DATA_SOURCE === 'local' ? 'local' : 'backend'
 
 let backendEvents: CalendarEvent[] = []
 
@@ -29,7 +32,15 @@ export async function loadEvents(): Promise<CalendarEvent[]> {
     return getLocalEvents()
   }
 
-  backendEvents = await getBackendEvents()
+  try {
+    const migration = await migrateLegacyEvents()
+    backendEvents = migration.events
+  } catch (error) {
+    if (error instanceof EventMigrationError) {
+      backendEvents = error.result.events
+    }
+    throw error
+  }
   return getEvents()
 }
 
@@ -80,7 +91,7 @@ export async function deleteEvent(id: string): Promise<boolean> {
 }
 
 export function getEventErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
+  if (error instanceof ApiError || error instanceof EventMigrationError) {
     return error.message
   }
   return fallback
