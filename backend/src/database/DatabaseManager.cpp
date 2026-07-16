@@ -17,6 +17,7 @@ namespace
 constexpr auto kDatabasePathEnv = "VOICECALENDAR_DB_PATH";
 constexpr auto kDefaultDatabaseFile = "voicecalendar.db";
 constexpr auto kCreateEventsMigration = "001_create_events.sql";
+constexpr auto kCreateTasksMigration = "002_create_tasks.sql";
 
 std::filesystem::path normalizePath(std::filesystem::path path)
 {
@@ -164,14 +165,17 @@ std::filesystem::path DatabaseManager::resolveBackendRoot()
     return std::filesystem::current_path() / "backend";
 }
 
-std::filesystem::path DatabaseManager::resolveMigrationPath()
+std::vector<std::filesystem::path> DatabaseManager::resolveMigrationPaths()
 {
-    return resolveBackendRoot() / "migrations" / kCreateEventsMigration;
+    const auto migrationsRoot = resolveBackendRoot() / "migrations";
+    return {
+        migrationsRoot / kCreateEventsMigration,
+        migrationsRoot / kCreateTasksMigration,
+    };
 }
 
-std::string DatabaseManager::readMigrationSql()
+std::string DatabaseManager::readMigrationSql(const std::filesystem::path& migrationPath)
 {
-    const auto migrationPath = resolveMigrationPath();
     std::ifstream migrationFile(migrationPath);
     if (!migrationFile)
     {
@@ -192,20 +196,24 @@ drogon::orm::DbClientPtr DatabaseManager::createClient() const
 
 void DatabaseManager::runMigrations(const drogon::orm::DbClientPtr& client) const
 {
-    for (const auto& statement : splitMigrationStatements(readMigrationSql()))
+    for (const auto& migrationPath : resolveMigrationPaths())
     {
-        client->execSqlSync(statement);
+        for (const auto& statement : splitMigrationStatements(readMigrationSql(migrationPath)))
+        {
+            client->execSqlSync(statement);
+        }
     }
 }
 
 void DatabaseManager::verifySchema(const drogon::orm::DbClientPtr& client) const
 {
     const auto result = client->execSqlSync(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events';");
+        "SELECT name FROM sqlite_master WHERE type = 'table' "
+        "AND name IN ('events', 'tasks');");
 
-    if (result.empty())
+    if (result.size() != 2)
     {
-        throw std::runtime_error("SQLite schema verification failed: events table is missing");
+        throw std::runtime_error("SQLite schema verification failed: events or tasks table is missing");
     }
 }
 

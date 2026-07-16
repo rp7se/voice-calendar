@@ -1388,6 +1388,43 @@
   font-size: 14px;
 }
 
+.task-service-status,
+.task-operation-error {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(126, 172, 190, 0.18);
+  background: rgba(17, 31, 39, 0.72);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.task-service-status--error,
+.task-operation-error {
+  border-color: rgba(217, 122, 122, 0.3);
+  color: #efb5b5;
+}
+
+.task-service-status--error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.task-service-status--error button {
+  flex: none;
+  border: 1px solid rgba(217, 122, 122, 0.34);
+  background: transparent;
+  color: inherit;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.task-service-status--error button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .tasks-context-stack,
 .task-overview-grid {
   display: grid;

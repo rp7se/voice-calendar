@@ -6,7 +6,9 @@ type TaskEditorModalProps = {
   task?: Task | null
   categories: EventCategory[]
   defaultCategoryId?: string | null
-  onSave: (task: TaskInput, taskId?: string) => void
+  isSaving?: boolean
+  errorMessage?: string
+  onSave: (task: TaskInput, taskId?: string) => void | Promise<void>
   onClose: () => void
 }
 
@@ -39,6 +41,8 @@ export default function TaskEditorModal({
   task,
   categories,
   defaultCategoryId = null,
+  isSaving = false,
+  errorMessage = '',
   onSave,
   onClose,
 }: TaskEditorModalProps) {
@@ -51,7 +55,7 @@ export default function TaskEditorModal({
       return
     }
 
-    onSave(
+    void onSave(
       {
         title,
         status: task?.status ?? 'pending',
@@ -68,7 +72,7 @@ export default function TaskEditorModal({
   }
 
   return (
-    <div className="task-editor-overlay" onClick={onClose}>
+    <div className="task-editor-overlay" onClick={isSaving ? undefined : onClose}>
       <section
         className="task-editor-modal"
         role="dialog"
@@ -81,7 +85,7 @@ export default function TaskEditorModal({
             <span>Task Detail</span>
             <h2>{task ? '编辑任务' : '新建任务'}</h2>
           </div>
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={onClose} disabled={isSaving}>
             关闭
           </button>
         </header>
@@ -146,7 +150,11 @@ export default function TaskEditorModal({
               type="date"
               value={form.deadlineDate}
               onChange={(event) =>
-                setForm((prev) => ({ ...prev, deadlineDate: event.target.value }))
+                setForm((prev) => ({
+                  ...prev,
+                  deadlineDate: event.target.value,
+                  deadlineTime: event.target.value ? prev.deadlineTime : '',
+                }))
               }
             />
           </div>
@@ -157,6 +165,7 @@ export default function TaskEditorModal({
               id="task-deadline-time"
               type="time"
               value={form.deadlineTime}
+              disabled={!form.deadlineDate}
               onChange={(event) =>
                 setForm((prev) => ({ ...prev, deadlineTime: event.target.value }))
               }
@@ -181,8 +190,14 @@ export default function TaskEditorModal({
             </select>
           </div>
 
-          <button type="submit" className="task-editor-submit">
-            {task ? '保存任务' : '创建任务'}
+          {errorMessage && (
+            <p className="task-operation-error task-editor-wide" role="alert">
+              {errorMessage}
+            </p>
+          )}
+
+          <button type="submit" className="task-editor-submit" disabled={isSaving}>
+            {isSaving ? '正在保存...' : task ? '保存任务' : '创建任务'}
           </button>
         </form>
       </section>

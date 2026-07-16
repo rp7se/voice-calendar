@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { EventCategory } from '../../types/calendar.ts'
 import type { Task, TaskInput } from '../../types/task.ts'
 import { getCategories } from '../../utils/storage.ts'
-import { addTask, deleteTask, getTasks, updateTask } from '../../utils/taskStorage.ts'
 import SchedulingPreviewModal from './SchedulingPreviewModal.tsx'
 import TaskEditorModal from './TaskEditorModal.tsx'
 import TaskList from './TaskList.tsx'
@@ -14,11 +13,17 @@ import {
 } from './taskUtils.ts'
 
 type TasksWorkspaceProps = {
+  tasks: Task[]
+  loadStatus: 'loading' | 'ready' | 'error'
+  loadError?: string
   selectedCategoryId?: string | null
   selectedCategoryName?: string | null
   createTaskSignal?: number
   isSchedulingOpen?: boolean
-  onTasksChange?: () => void
+  onRetryLoad: () => void
+  onCreateTask: (input: TaskInput) => Promise<void>
+  onUpdateTask: (id: string, input: TaskInput) => Promise<void>
+  onDeleteTask: (id: string) => Promise<void>
   onEventsChange?: () => void
   onOpenAutoSchedule?: () => void
   onCloseAutoSchedule?: () => void
@@ -31,19 +36,26 @@ const TASK_TABS: Array<{ id: TaskTab; label: string }> = [
 ]
 
 export default function TasksWorkspace({
+  tasks,
+  loadStatus,
+  loadError = '',
   selectedCategoryId = null,
   selectedCategoryName = null,
   createTaskSignal = 0,
   isSchedulingOpen = false,
-  onTasksChange,
+  onRetryLoad,
+  onCreateTask,
+  onUpdateTask,
+  onDeleteTask,
   onEventsChange,
   onOpenAutoSchedule,
   onCloseAutoSchedule,
 }: TasksWorkspaceProps) {
-  const [tasks, setTasks] = useState(() => getTasks())
   const [activeTab, setActiveTab] = useState<TaskTab>('today')
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [operationError, setOperationError] = useState('')
   const lastCreateTaskSignalRef = useRef(createTaskSignal)
 
   const categories: EventCategory[] = getCategories()
@@ -61,12 +73,8 @@ export default function TasksWorkspace({
     [selectedCategoryId, tasks],
   )
 
-  const refreshTasks = () => {
-    setTasks(getTasks())
-    onTasksChange?.()
-  }
-
   const openCreateTask = () => {
+    setOperationError('')
     setEditingTask(null)
     setIsEditorOpen(true)
   }
@@ -82,31 +90,48 @@ export default function TasksWorkspace({
   }, [createTaskSignal])
 
   const openEditTask = (task: Task) => {
+    setOperationError('')
     setEditingTask(task)
     setIsEditorOpen(true)
   }
 
-  const handleSaveTask = (taskInput: TaskInput, taskId?: string) => {
-    if (taskId) {
-      updateTask(taskId, taskInput)
-    } else {
-      addTask(taskInput)
+  const handleSaveTask = async (taskInput: TaskInput, taskId?: string) => {
+    setIsSaving(true)
+    setOperationError('')
+    try {
+      if (taskId) {
+        await onUpdateTask(taskId, taskInput)
+      } else {
+        await onCreateTask(taskInput)
+      }
+      setIsEditorOpen(false)
+      setEditingTask(null)
+    } catch {
+      setOperationError('任务保存失败，请确认任务服务是否正常运行。')
+    } finally {
+      setIsSaving(false)
     }
-    setIsEditorOpen(false)
-    setEditingTask(null)
-    refreshTasks()
   }
 
-  const handleToggleTask = (task: Task) => {
-    updateTask(task.id, {
-      status: task.status === 'completed' ? 'pending' : 'completed',
-    })
-    refreshTasks()
+  const handleToggleTask = async (task: Task) => {
+    setOperationError('')
+    try {
+      await onUpdateTask(task.id, {
+        ...task,
+        status: task.status === 'completed' ? 'pending' : 'completed',
+      })
+    } catch {
+      setOperationError('任务状态更新失败，原状态已保留。')
+    }
   }
 
-  const handleDeleteTask = (taskId: string) => {
-    deleteTask(taskId)
-    refreshTasks()
+  const handleDeleteTask = async (taskId: string) => {
+    setOperationError('')
+    try {
+      await onDeleteTask(taskId)
+    } catch {
+      setOperationError('任务删除失败，原任务已保留。')
+    }
   }
 
   return (
@@ -136,6 +161,19 @@ export default function TasksWorkspace({
         </div>
       </header>
 
+      {loadStatus === 'loading' && (
+        <p className="task-service-status" role="status">正在加载任务...</p>
+      )}
+      {loadStatus === 'error' && (
+        <div className="task-service-status task-service-status--error" role="alert">
+          <span>{loadError || '暂时无法连接任务服务。'}</span>
+          <button type="button" onClick={onRetryLoad}>重试</button>
+        </div>
+      )}
+      {operationError && !isEditorOpen && (
+        <p className="task-operation-error" role="alert">{operationError}</p>
+      )}
+
       {schedulableTasks.length === 0 && (
         <p id="task-auto-hint" className="task-auto-hint" role="status">
           暂无需要安排的任务。
@@ -158,9 +196,9 @@ export default function TasksWorkspace({
       <TaskList
         tasks={visibleTasks}
         categories={categories}
-        onToggleTask={handleToggleTask}
+        onToggleTask={(task) => void handleToggleTask(task)}
         onEditTask={openEditTask}
-        onDeleteTask={handleDeleteTask}
+        onDeleteTask={(taskId) => void handleDeleteTask(taskId)}
       />
 
       {isEditorOpen && (
@@ -168,8 +206,15 @@ export default function TasksWorkspace({
           task={editingTask}
           categories={categories}
           defaultCategoryId={selectedCategoryId}
+          isSaving={isSaving}
+          errorMessage={operationError}
           onSave={handleSaveTask}
-          onClose={() => setIsEditorOpen(false)}
+          onClose={() => {
+            if (!isSaving) {
+              setIsEditorOpen(false)
+              setOperationError('')
+            }
+          }}
         />
       )}
 

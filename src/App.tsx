@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react'
+import {
+  createTask as createBackendTask,
+  deleteTask as deleteBackendTask,
+  updateTask as updateBackendTask,
+} from './api/taskApi.ts'
 import AmbientBackground from './components/AmbientBackground.tsx'
 import CalendarView from './components/CalendarView.tsx'
 import CategoryPanel from './components/CategoryPanel.tsx'
@@ -22,13 +27,14 @@ import TodayOverview from './components/today/TodayOverview.tsx'
 import TodayWorkspace from './components/today/TodayWorkspace.tsx'
 import VoiceOrb from './components/voice/VoiceOrb.tsx'
 import { formatDate } from './utils/date.ts'
+import { migrateLegacyTasks, TaskMigrationError } from './migrations/taskMigration.ts'
 import {
   getEventErrorMessage,
   isBackendEventDataSource,
   loadEvents,
 } from './services/eventDataSource.ts'
 import { getCategories } from './utils/storage.ts'
-import { getTasks } from './utils/taskStorage.ts'
+import type { Task, TaskInput } from './types/task.ts'
 import './App.css'
 
 const WORKSPACE_PLACEHOLDERS: Record<
@@ -58,6 +64,7 @@ const DEFAULT_VOICE_STATUS: VoiceRuntimeStatus = {
 }
 
 type EventLoadStatus = 'ready' | 'loading' | 'error'
+type TaskLoadStatus = 'ready' | 'loading' | 'error'
 
 const EVENT_LOADING_MESSAGE = '正在检查并迁移旧日程...'
 
@@ -66,7 +73,9 @@ function App() {
   const [, setEventsVersion] = useState(0)
   const [, setCategoriesVersion] = useState(0)
   const [countdownVersion, setCountdownVersion] = useState(0)
-  const [taskVersion, setTaskVersion] = useState(0)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [taskLoadStatus, setTaskLoadStatus] = useState<TaskLoadStatus>('loading')
+  const [taskLoadError, setTaskLoadError] = useState('')
   const [isDayDetailOpen, setIsDayDetailOpen] = useState(false)
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('today')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
@@ -118,8 +127,37 @@ function App() {
     setCountdownVersion((version) => version + 1)
   }
 
-  const handleTasksChange = () => {
-    setTaskVersion((version) => version + 1)
+  const retryBackendTasks = async () => {
+    setTaskLoadStatus('loading')
+    setTaskLoadError('')
+    try {
+      const result = await migrateLegacyTasks()
+      setTasks(result.tasks)
+      setTaskLoadStatus('ready')
+    } catch (error) {
+      if (error instanceof TaskMigrationError) {
+        setTasks(error.result.tasks)
+        setTaskLoadError(error.message)
+      } else {
+        setTaskLoadError('暂时无法连接任务服务。')
+      }
+      setTaskLoadStatus('error')
+    }
+  }
+
+  const handleCreateTask = async (input: TaskInput) => {
+    const created = await createBackendTask(input)
+    setTasks((current) => [...current, created])
+  }
+
+  const handleUpdateTask = async (id: string, input: TaskInput) => {
+    const updated = await updateBackendTask(id, input)
+    setTasks((current) => current.map((task) => (task.id === id ? updated : task)))
+  }
+
+  const handleDeleteTask = async (id: string) => {
+    await deleteBackendTask(id)
+    setTasks((current) => current.filter((task) => task.id !== id))
   }
 
   const handleToggleVoiceInput = () => {
@@ -185,6 +223,32 @@ function App() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+    void migrateLegacyTasks()
+      .then((result) => {
+        if (!cancelled) {
+          setTasks(result.tasks)
+          setTaskLoadStatus('ready')
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          if (error instanceof TaskMigrationError) {
+            setTasks(error.result.tasks)
+            setTaskLoadError(error.message)
+          } else {
+            setTaskLoadError('暂时无法连接任务服务。')
+          }
+          setTaskLoadStatus('error')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'k') {
         event.preventDefault()
@@ -200,10 +264,10 @@ function App() {
     if (activeWorkspace === 'today') {
       return (
         <TodayWorkspace
+          tasks={tasks}
           selectedCategoryId={selectedCategoryId}
           selectedCategoryName={selectedCategory?.name ?? null}
-          taskRefreshVersion={taskVersion}
-          onTasksChange={handleTasksChange}
+          onUpdateTask={handleUpdateTask}
           onOpenCalendar={() => setActiveWorkspace('calendar')}
         />
       )
@@ -212,11 +276,17 @@ function App() {
     if (activeWorkspace === 'tasks') {
       return (
         <TasksWorkspace
+          tasks={tasks}
+          loadStatus={taskLoadStatus}
+          loadError={taskLoadError}
           selectedCategoryId={selectedCategoryId}
           selectedCategoryName={selectedCategory?.name ?? null}
           createTaskSignal={createTaskSignal}
           isSchedulingOpen={isAutoScheduleOpen}
-          onTasksChange={handleTasksChange}
+          onRetryLoad={() => void retryBackendTasks()}
+          onCreateTask={handleCreateTask}
+          onUpdateTask={handleUpdateTask}
+          onDeleteTask={handleDeleteTask}
           onEventsChange={handleEventsChange}
           onOpenAutoSchedule={handleOpenAutoSchedule}
           onCloseAutoSchedule={() => setIsAutoScheduleOpen(false)}
@@ -261,7 +331,7 @@ function App() {
         ? 'Today & Voice'
         : 'Calendar & Voice'
 
-  const scopedTasks = filterTasksByCategory(getTasks(), selectedCategoryId)
+  const scopedTasks = filterTasksByCategory(tasks, selectedCategoryId)
 
   return (
     <>
@@ -372,6 +442,7 @@ function App() {
             isOpen={isCommandPaletteOpen}
             activeWorkspace={activeWorkspace}
             voiceStatus={voiceStatus}
+            tasks={tasks}
             onClose={() => setIsCommandPaletteOpen(false)}
             onNavigate={setActiveWorkspace}
             onOpenNewEvent={handleOpenNewEvent}

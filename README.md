@@ -171,6 +171,16 @@ VITE_EVENT_DATA_SOURCE=backend
 
 开发服务器会把浏览器的 `/api` 请求代理到 `http://127.0.0.1:8080`。
 
+Backend 同时提供 Task CRUD API：
+
+```text
+GET    /api/tasks
+GET    /api/tasks/:id
+POST   /api/tasks
+PUT    /api/tasks/:id
+DELETE /api/tasks/:id
+```
+
 启动后在浏览器中打开：
 
 ```text
@@ -196,9 +206,10 @@ npm run build
 * 分类文件夹
 * 分类与日期的关联关系
 
-backend 模式下只有 Event 通过 C++ API 保存到 SQLite；分类、倒计时和任务仍保持现有本地存储。
+backend 模式下 Event 与 Task 均通过 C++ API 保存到 SQLite；分类和倒计时仍保持现有本地存储。
 首次升级时，旧版 `localStorage` Event 会在验证 Backend 可用后安全迁移到 SQLite。
 迁移成功后旧 Event 暂时保留为备份，但运行时只读写 Backend，不会双写。
+旧版 `voice-calendar:tasks` Task 也会通过独立迁移标记安全迁移；迁移成功后旧数据保留为备份，Task 运行时只读写 Backend。
 `VITE_EVENT_DATA_SOURCE=local` 仅保留用于开发调试或紧急回退。
 
 ## 开发过程说明

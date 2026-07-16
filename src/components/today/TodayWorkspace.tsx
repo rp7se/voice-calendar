@@ -1,12 +1,13 @@
 import DailyTimeline from './DailyTimeline.tsx'
 import TodayTasks from './TodayTasks.tsx'
 import { getTodayEvents } from './todayData.ts'
+import type { Task, TaskInput } from '../../types/task.ts'
 
 type TodayWorkspaceProps = {
   selectedCategoryName?: string | null
   selectedCategoryId?: string | null
-  taskRefreshVersion?: number
-  onTasksChange?: () => void
+  tasks: Task[]
+  onUpdateTask: (id: string, input: TaskInput) => Promise<void>
   onOpenCalendar: () => void
 }
 
@@ -30,8 +31,8 @@ function getGreeting(date: Date): string {
 export default function TodayWorkspace({
   selectedCategoryName = null,
   selectedCategoryId = null,
-  taskRefreshVersion = 0,
-  onTasksChange,
+  tasks,
+  onUpdateTask,
   onOpenCalendar,
 }: TodayWorkspaceProps) {
   const now = new Date()
@@ -57,9 +58,9 @@ export default function TodayWorkspace({
       <DailyTimeline events={todayEvents} onOpenCalendar={onOpenCalendar} />
       <TodayTasks
         events={todayEvents}
+        tasks={tasks}
         selectedCategoryId={selectedCategoryId}
-        refreshVersion={taskRefreshVersion}
-        onTasksChange={onTasksChange}
+        onUpdateTask={onUpdateTask}
       />
     </div>
   )
