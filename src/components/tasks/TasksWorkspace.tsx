@@ -3,6 +3,7 @@ import type { EventCategory } from '../../types/calendar.ts'
 import type { Task, TaskInput } from '../../types/task.ts'
 import { getCategories } from '../../utils/storage.ts'
 import { addTask, deleteTask, getTasks, updateTask } from '../../utils/taskStorage.ts'
+import SchedulingPreviewModal from './SchedulingPreviewModal.tsx'
 import TaskEditorModal from './TaskEditorModal.tsx'
 import TaskList from './TaskList.tsx'
 import {
@@ -16,7 +17,11 @@ type TasksWorkspaceProps = {
   selectedCategoryId?: string | null
   selectedCategoryName?: string | null
   createTaskSignal?: number
+  isSchedulingOpen?: boolean
   onTasksChange?: () => void
+  onEventsChange?: () => void
+  onOpenAutoSchedule?: () => void
+  onCloseAutoSchedule?: () => void
 }
 
 const TASK_TABS: Array<{ id: TaskTab; label: string }> = [
@@ -29,7 +34,11 @@ export default function TasksWorkspace({
   selectedCategoryId = null,
   selectedCategoryName = null,
   createTaskSignal = 0,
+  isSchedulingOpen = false,
   onTasksChange,
+  onEventsChange,
+  onOpenAutoSchedule,
+  onCloseAutoSchedule,
 }: TasksWorkspaceProps) {
   const [tasks, setTasks] = useState(() => getTasks())
   const [activeTab, setActiveTab] = useState<TaskTab>('today')
@@ -43,6 +52,14 @@ export default function TasksWorkspace({
     const categoryTasks = filterTasksByCategory(tasks, selectedCategoryId)
     return sortTasks(filterTasksByTab(categoryTasks, activeTab))
   }, [activeTab, selectedCategoryId, tasks])
+
+  const schedulableTasks = useMemo(
+    () =>
+      filterTasksByCategory(tasks, selectedCategoryId).filter(
+        (task) => task.status === 'pending',
+      ),
+    [selectedCategoryId, tasks],
+  )
 
   const refreshTasks = () => {
     setTasks(getTasks())
@@ -107,11 +124,23 @@ export default function TasksWorkspace({
           <button type="button" className="task-create-btn" onClick={openCreateTask}>
             + 新建任务
           </button>
-          <button type="button" className="task-auto-btn" disabled>
+          <button
+            type="button"
+            className="task-auto-btn"
+            onClick={onOpenAutoSchedule}
+            disabled={schedulableTasks.length === 0}
+            aria-describedby={schedulableTasks.length === 0 ? 'task-auto-hint' : undefined}
+          >
             自动安排
           </button>
         </div>
       </header>
+
+      {schedulableTasks.length === 0 && (
+        <p id="task-auto-hint" className="task-auto-hint" role="status">
+          暂无需要安排的任务。
+        </p>
+      )}
 
       <nav className="task-filter-tabs" aria-label="Task filters">
         {TASK_TABS.map((tab) => (
@@ -141,6 +170,16 @@ export default function TasksWorkspace({
           defaultCategoryId={selectedCategoryId}
           onSave={handleSaveTask}
           onClose={() => setIsEditorOpen(false)}
+        />
+      )}
+
+      {isSchedulingOpen && schedulableTasks.length > 0 && (
+        <SchedulingPreviewModal
+          tasks={schedulableTasks}
+          categories={categories}
+          selectedCategoryName={selectedCategoryName}
+          onEventsChange={onEventsChange}
+          onClose={() => onCloseAutoSchedule?.()}
         />
       )}
     </div>

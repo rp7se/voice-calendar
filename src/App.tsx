@@ -76,6 +76,7 @@ function App() {
   const [voiceTextCommand, setVoiceTextCommand] = useState<VoiceExternalCommand | null>(null)
   const [voiceStatus, setVoiceStatus] = useState<VoiceRuntimeStatus>(DEFAULT_VOICE_STATUS)
   const [createTaskSignal, setCreateTaskSignal] = useState(0)
+  const [isAutoScheduleOpen, setIsAutoScheduleOpen] = useState(false)
   const [eventLoadStatus, setEventLoadStatus] = useState<EventLoadStatus>(() =>
     isBackendEventDataSource() ? 'loading' : 'ready',
   )
@@ -147,6 +148,11 @@ function App() {
     setCreateTaskSignal((signal) => signal + 1)
   }
 
+  const handleOpenAutoSchedule = () => {
+    setActiveWorkspace('tasks')
+    setIsAutoScheduleOpen(true)
+  }
+
   const handleOpenEventDate = (date: string) => {
     setSelectedDate(date)
     setActiveWorkspace('calendar')
@@ -209,7 +215,11 @@ function App() {
           selectedCategoryId={selectedCategoryId}
           selectedCategoryName={selectedCategory?.name ?? null}
           createTaskSignal={createTaskSignal}
+          isSchedulingOpen={isAutoScheduleOpen}
           onTasksChange={handleTasksChange}
+          onEventsChange={handleEventsChange}
+          onOpenAutoSchedule={handleOpenAutoSchedule}
+          onCloseAutoSchedule={() => setIsAutoScheduleOpen(false)}
         />
       )
     }
@@ -300,6 +310,7 @@ function App() {
                 <TasksContextPanel
                   tasks={scopedTasks}
                   selectedCategoryName={selectedCategory?.name ?? null}
+                  onAutoSchedule={handleOpenAutoSchedule}
                 />
               )}
 
