@@ -1,5 +1,7 @@
 #include "http/EventJson.h"
 
+#include "utils/DateTimeUtils.h"
+
 #include <algorithm>
 #include <cctype>
 
@@ -28,69 +30,6 @@ std::string trim(std::string value)
     return std::string(first, last);
 }
 
-bool hasExactDigits(const std::string& value, std::size_t offset, std::size_t count)
-{
-    if (offset + count > value.size())
-    {
-        return false;
-    }
-    for (std::size_t index = offset; index < offset + count; ++index)
-    {
-        if (std::isdigit(static_cast<unsigned char>(value[index])) == 0)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-int parseNumber(const std::string& value, std::size_t offset, std::size_t count)
-{
-    return std::stoi(value.substr(offset, count));
-}
-
-bool isLeapYear(int year)
-{
-    return year % 400 == 0 || (year % 4 == 0 && year % 100 != 0);
-}
-
-bool isValidDate(const std::string& value)
-{
-    if (value.size() != 10 || value[4] != '-' || value[7] != '-' ||
-        !hasExactDigits(value, 0, 4) || !hasExactDigits(value, 5, 2) ||
-        !hasExactDigits(value, 8, 2))
-    {
-        return false;
-    }
-
-    const auto year = parseNumber(value, 0, 4);
-    const auto month = parseNumber(value, 5, 2);
-    const auto day = parseNumber(value, 8, 2);
-    if (year == 0 || month < 1 || month > 12)
-    {
-        return false;
-    }
-
-    constexpr int daysPerMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    auto maxDay = daysPerMonth[month - 1];
-    if (month == 2 && isLeapYear(year))
-    {
-        maxDay = 29;
-    }
-    return day >= 1 && day <= maxDay;
-}
-
-bool isValidTime(const std::string& value)
-{
-    if (value.size() != 5 || value[2] != ':' ||
-        !hasExactDigits(value, 0, 2) || !hasExactDigits(value, 3, 2))
-    {
-        return false;
-    }
-    const auto hour = parseNumber(value, 0, 2);
-    const auto minute = parseNumber(value, 3, 2);
-    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
-}
 } // namespace
 
 Json::Value eventToJson(const models::Event& event)
@@ -150,7 +89,7 @@ EventParseResult parseEventInput(
     {
         return invalid("date is required");
     }
-    if (!json["date"].isString() || !isValidDate(json["date"].asString()))
+    if (!json["date"].isString() || !utils::isValidDate(json["date"].asString()))
     {
         return invalid("date must be a valid YYYY-MM-DD value");
     }
@@ -159,7 +98,8 @@ EventParseResult parseEventInput(
     {
         return invalid("startTime is required");
     }
-    if (!json["startTime"].isString() || !isValidTime(json["startTime"].asString()))
+    if (!json["startTime"].isString() ||
+        !utils::parseTimeToMinutes(json["startTime"].asString()))
     {
         return invalid("startTime must be a valid HH:mm value");
     }
@@ -180,7 +120,8 @@ EventParseResult parseEventInput(
 
     if (json.isMember("endTime") && !json["endTime"].isNull())
     {
-        if (!json["endTime"].isString() || !isValidTime(json["endTime"].asString()))
+        if (!json["endTime"].isString() ||
+            !utils::parseTimeToMinutes(json["endTime"].asString()))
         {
             return invalid("endTime must be null or a valid HH:mm value");
         }

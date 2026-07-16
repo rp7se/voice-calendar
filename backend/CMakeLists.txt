@@ -14,12 +14,15 @@ target_sources(voicecalendar_backend
   PRIVATE
     src/main.cpp
     src/controllers/EventController.cpp
+    src/controllers/FreeTimeController.cpp
     src/controllers/HealthController.cpp
     src/database/DatabaseManager.cpp
     src/http/EventJson.cpp
     src/models/Event.cpp
     src/repositories/EventRepository.cpp
     src/services/EventConflictService.cpp
+    src/services/FreeTimeService.cpp
+    src/utils/DateTimeUtils.cpp
 )
 
 target_include_directories(voicecalendar_backend

@@ -1,29 +1,9 @@
 #include "services/EventConflictService.h"
 
-#include <cctype>
+#include "utils/DateTimeUtils.h"
 
 namespace voicecalendar::services
 {
-
-std::optional<int> EventConflictService::parseMinutes(const std::string& value)
-{
-    if (value.size() != 5 || value[2] != ':' ||
-        std::isdigit(static_cast<unsigned char>(value[0])) == 0 ||
-        std::isdigit(static_cast<unsigned char>(value[1])) == 0 ||
-        std::isdigit(static_cast<unsigned char>(value[3])) == 0 ||
-        std::isdigit(static_cast<unsigned char>(value[4])) == 0)
-    {
-        return std::nullopt;
-    }
-
-    const auto hour = (value[0] - '0') * 10 + (value[1] - '0');
-    const auto minute = (value[3] - '0') * 10 + (value[4] - '0');
-    if (hour > 23 || minute > 59)
-    {
-        return std::nullopt;
-    }
-    return hour * 60 + minute;
-}
 
 bool EventConflictService::overlaps(
     int newStart,
@@ -45,8 +25,8 @@ ConflictCheckResult EventConflictService::findConflicts(
         return result;
     }
 
-    const auto newStart = parseMinutes(event.startTime);
-    const auto newEnd = parseMinutes(*event.endTime);
+    const auto newStart = utils::parseTimeToMinutes(event.startTime);
+    const auto newEnd = utils::parseTimeToMinutes(*event.endTime);
     if (!newStart || !newEnd || *newStart >= *newEnd)
     {
         result.validTimeRange = false;
@@ -62,8 +42,8 @@ ConflictCheckResult EventConflictService::findConflicts(
             continue;
         }
 
-        const auto existingStart = parseMinutes(existing.startTime);
-        const auto existingEnd = parseMinutes(*existing.endTime);
+        const auto existingStart = utils::parseTimeToMinutes(existing.startTime);
+        const auto existingEnd = utils::parseTimeToMinutes(*existing.endTime);
         if (!existingStart || !existingEnd || *existingStart >= *existingEnd)
         {
             continue;

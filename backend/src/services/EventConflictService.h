@@ -25,7 +25,6 @@ public:
         const std::optional<std::string>& excludeEventId = std::nullopt) const;
 
 private:
-    static std::optional<int> parseMinutes(const std::string& value);
     static bool overlaps(
         int newStart,
         int newEnd,

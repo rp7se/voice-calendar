@@ -88,7 +88,11 @@ GET    /api/events/{id}
 POST   /api/events
 PUT    /api/events/{id}
 DELETE /api/events/{id}
+GET    /api/free-time?date=2026-07-20&start=08:00&end=22:00
 ```
 
 `POST` and `PUT` reject overlapping same-day `[startTime, endTime)` ranges with
 HTTP `409` and the machine-readable error code `event_conflict`.
+
+`GET /api/free-time` returns the free `[start, end)` slots within the requested
+same-day time range, including each slot's `durationMinutes`.
