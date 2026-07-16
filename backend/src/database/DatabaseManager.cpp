@@ -83,20 +83,26 @@ DatabaseManager DatabaseManager::create()
     return DatabaseManager{resolveDefaultDatabasePath()};
 }
 
+DatabaseManager& DatabaseManager::instance()
+{
+    static auto manager = create();
+    return manager;
+}
+
 DatabaseManager::DatabaseManager(std::filesystem::path databasePath)
     : databasePath_(normalizePath(std::move(databasePath)))
 {
 }
 
-void DatabaseManager::initialize() const
+void DatabaseManager::initialize()
 {
     try
     {
         std::filesystem::create_directories(databasePath_.parent_path());
 
-        const auto client = createClient();
-        runMigrations(client);
-        verifySchema(client);
+        client_ = createClient();
+        runMigrations(client_);
+        verifySchema(client_);
 
         std::cout << "Database ready: " << databasePath_.string() << '\n';
     }
@@ -113,6 +119,16 @@ void DatabaseManager::initialize() const
 const std::filesystem::path& DatabaseManager::databasePath() const noexcept
 {
     return databasePath_;
+}
+
+drogon::orm::DbClientPtr DatabaseManager::client() const
+{
+    if (!client_)
+    {
+        throw std::runtime_error("DatabaseManager has not been initialized");
+    }
+
+    return client_;
 }
 
 std::filesystem::path DatabaseManager::resolveDefaultDatabasePath()

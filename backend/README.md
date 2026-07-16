@@ -79,3 +79,13 @@ Invoke-RestMethod http://127.0.0.1:8080/api/health
   "version": "0.1.0"
 }
 ```
+
+## Event API
+
+```text
+GET    /api/events
+GET    /api/events/{id}
+POST   /api/events
+PUT    /api/events/{id}
+DELETE /api/events/{id}
+```

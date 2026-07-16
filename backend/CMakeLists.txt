@@ -13,9 +13,12 @@ add_executable(voicecalendar_backend)
 target_sources(voicecalendar_backend
   PRIVATE
     src/main.cpp
+    src/controllers/EventController.cpp
     src/controllers/HealthController.cpp
     src/database/DatabaseManager.cpp
+    src/http/EventJson.cpp
     src/models/Event.cpp
+    src/repositories/EventRepository.cpp
 )
 
 target_include_directories(voicecalendar_backend

@@ -8,7 +8,7 @@ int main()
 {
     try
     {
-        const auto databaseManager = voicecalendar::database::DatabaseManager::create();
+        auto& databaseManager = voicecalendar::database::DatabaseManager::instance();
         databaseManager.initialize();
     }
     catch (const std::exception& error)
