@@ -4,6 +4,11 @@ import {
   deleteTask as deleteBackendTask,
   updateTask as updateBackendTask,
 } from './api/taskApi.ts'
+import {
+  createCategory as createBackendCategory,
+  deleteCategory as deleteBackendCategory,
+} from './api/categoryApi.ts'
+import { getTasks as getBackendTasks } from './api/taskApi.ts'
 import AmbientBackground from './components/AmbientBackground.tsx'
 import CalendarView from './components/CalendarView.tsx'
 import CategoryPanel from './components/CategoryPanel.tsx'
@@ -29,11 +34,17 @@ import VoiceOrb from './components/voice/VoiceOrb.tsx'
 import { formatDate } from './utils/date.ts'
 import { migrateLegacyTasks, TaskMigrationError } from './migrations/taskMigration.ts'
 import {
+  CategoryMigrationError,
+  migrateLegacyCategories,
+} from './migrations/categoryMigration.ts'
+import {
   getEventErrorMessage,
+  clearEventCategory,
   isBackendEventDataSource,
   loadEvents,
 } from './services/eventDataSource.ts'
-import { getCategories } from './utils/storage.ts'
+import { deleteCategoryDateLinks } from './utils/storage.ts'
+import type { EventCategory, EventCategoryInput } from './types/calendar.ts'
 import type { Task, TaskInput } from './types/task.ts'
 import './App.css'
 
@@ -65,17 +76,22 @@ const DEFAULT_VOICE_STATUS: VoiceRuntimeStatus = {
 
 type EventLoadStatus = 'ready' | 'loading' | 'error'
 type TaskLoadStatus = 'ready' | 'loading' | 'error'
+type CategoryLoadStatus = 'ready' | 'loading' | 'error'
 
 const EVENT_LOADING_MESSAGE = '正在检查并迁移旧日程...'
 
 function App() {
   const [selectedDate, setSelectedDate] = useState(() => formatDate(new Date()))
   const [, setEventsVersion] = useState(0)
-  const [, setCategoriesVersion] = useState(0)
+  const [, setCategoryLinksVersion] = useState(0)
   const [countdownVersion, setCountdownVersion] = useState(0)
   const [tasks, setTasks] = useState<Task[]>([])
   const [taskLoadStatus, setTaskLoadStatus] = useState<TaskLoadStatus>('loading')
   const [taskLoadError, setTaskLoadError] = useState('')
+  const [categories, setCategories] = useState<EventCategory[]>([])
+  const [categoryLoadStatus, setCategoryLoadStatus] =
+    useState<CategoryLoadStatus>('loading')
+  const [categoryLoadError, setCategoryLoadError] = useState('')
   const [isDayDetailOpen, setIsDayDetailOpen] = useState(false)
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceId>('today')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
@@ -92,7 +108,7 @@ function App() {
   const [eventLoadError, setEventLoadError] = useState('')
 
   const selectedCategory =
-    getCategories().find((category) => category.id === selectedCategoryId) ?? null
+    categories.find((category) => category.id === selectedCategoryId) ?? null
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(formatDate(date))
@@ -116,10 +132,55 @@ function App() {
     }
   }
 
-  const handleCategoriesChange = () => {
-    setCategoriesVersion((version) => version + 1)
-    if (selectedCategoryId && !getCategories().some((item) => item.id === selectedCategoryId)) {
-      setSelectedCategoryId(null)
+  const handleCategoryDateLinksChange = () => {
+    setCategoryLinksVersion((version) => version + 1)
+  }
+
+  const retryBackendCategories = async () => {
+    setCategoryLoadStatus('loading')
+    setCategoryLoadError('')
+    try {
+      const result = await migrateLegacyCategories()
+      setCategories(result.categories)
+      setCategoryLoadStatus('ready')
+    } catch (error) {
+      if (error instanceof CategoryMigrationError) {
+        setCategories(error.result.categories)
+        setCategoryLoadError(error.message)
+      } else {
+        setCategoryLoadError('暂时无法连接分类服务。')
+      }
+      setCategoryLoadStatus('error')
+    }
+  }
+
+  const handleCreateCategory = async (input: EventCategoryInput) => {
+    const created = await createBackendCategory(input)
+    setCategories((current) => [...current, created])
+  }
+
+  const handleDeleteCategory = async (id: string) => {
+    await deleteBackendCategory(id)
+
+    setCategories((current) => current.filter((category) => category.id !== id))
+    setSelectedCategoryId((current) => (current === id ? null : current))
+    setTasks((current) => current.map((task) =>
+      task.categoryId === id ? { ...task, categoryId: undefined } : task,
+    ))
+    clearEventCategory(id)
+    deleteCategoryDateLinks(id)
+    setEventsVersion((version) => version + 1)
+    setCategoryLinksVersion((version) => version + 1)
+
+    try {
+      const [refreshedTasks] = await Promise.all([
+        getBackendTasks(),
+        loadEvents(),
+      ])
+      setTasks(refreshedTasks)
+      setEventsVersion((version) => version + 1)
+    } catch {
+      // Local React state already mirrors the committed delete transaction.
     }
   }
 
@@ -224,6 +285,32 @@ function App() {
 
   useEffect(() => {
     let cancelled = false
+    void migrateLegacyCategories()
+      .then((result) => {
+        if (!cancelled) {
+          setCategories(result.categories)
+          setCategoryLoadStatus('ready')
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          if (error instanceof CategoryMigrationError) {
+            setCategories(error.result.categories)
+            setCategoryLoadError(error.message)
+          } else {
+            setCategoryLoadError('暂时无法连接分类服务。')
+          }
+          setCategoryLoadStatus('error')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
     void migrateLegacyTasks()
       .then((result) => {
         if (!cancelled) {
@@ -277,6 +364,7 @@ function App() {
       return (
         <TasksWorkspace
           tasks={tasks}
+          categories={categories}
           loadStatus={taskLoadStatus}
           loadError={taskLoadError}
           selectedCategoryId={selectedCategoryId}
@@ -359,6 +447,8 @@ function App() {
           sidebar={
             <Sidebar
               activeWorkspace={activeWorkspace}
+              categories={categories}
+              categoryLoadStatus={categoryLoadStatus}
               selectedCategoryId={selectedCategoryId}
               onNavigate={setActiveWorkspace}
               onSelectCategory={setSelectedCategoryId}
@@ -391,8 +481,9 @@ function App() {
                 </div>
               )}
               <VoiceControl
+                categories={categories}
                 onCalendarChange={handleEventsChange}
-                onCategoryChange={handleCategoriesChange}
+                onCategoryChange={handleCategoryDateLinksChange}
                 listenSignal={voiceListenSignal}
                 textCommand={voiceTextCommand}
                 onRuntimeChange={setVoiceStatus}
@@ -401,7 +492,16 @@ function App() {
                 onCountdownChange={handleCountdownChange}
                 onEnterFocusMode={() => setIsFocusMode(true)}
               />
-              <CategoryPanel onCategoriesChange={handleCategoriesChange} />
+              <CategoryPanel
+                categories={categories}
+                tasks={tasks}
+                loadStatus={categoryLoadStatus}
+                loadError={categoryLoadError}
+                onRetryLoad={() => void retryBackendCategories()}
+                onCreateCategory={handleCreateCategory}
+                onDeleteCategory={handleDeleteCategory}
+                onDateLinksChange={handleCategoryDateLinksChange}
+              />
               {activeWorkspace !== 'tasks' && (
                 <section className="day-detail-hint panel-card">
                   <h2 className="section-title">日期详情</h2>
@@ -419,6 +519,7 @@ function App() {
 
         <DayDetailModal
           selectedDate={selectedDate}
+          categories={categories}
           isOpen={isDayDetailOpen}
           onClose={() => setIsDayDetailOpen(false)}
           onEventsChange={handleEventsChange}
@@ -443,6 +544,7 @@ function App() {
             activeWorkspace={activeWorkspace}
             voiceStatus={voiceStatus}
             tasks={tasks}
+            categories={categories}
             onClose={() => setIsCommandPaletteOpen(false)}
             onNavigate={setActiveWorkspace}
             onOpenNewEvent={handleOpenNewEvent}

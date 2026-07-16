@@ -2735,6 +2735,38 @@
   margin-bottom: var(--space-4);
 }
 
+.category-service-status,
+.category-operation-error {
+  margin: 0 0 12px;
+  padding: 9px 10px;
+  border: 1px solid rgba(126, 172, 190, 0.18);
+  background: rgba(17, 31, 39, 0.72);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.category-service-status--error,
+.category-operation-error {
+  border-color: rgba(217, 122, 122, 0.3);
+  color: #efb5b5;
+}
+
+.category-service-status--error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.category-service-status--error button {
+  flex: none;
+  border: 1px solid rgba(217, 122, 122, 0.34);
+  background: transparent;
+  color: inherit;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
 .category-folders,
 .category-event-list,
 .category-date-list,

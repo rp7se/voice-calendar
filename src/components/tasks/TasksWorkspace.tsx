@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { EventCategory } from '../../types/calendar.ts'
 import type { Task, TaskInput } from '../../types/task.ts'
-import { getCategories } from '../../utils/storage.ts'
 import SchedulingPreviewModal from './SchedulingPreviewModal.tsx'
 import TaskEditorModal from './TaskEditorModal.tsx'
 import TaskList from './TaskList.tsx'
@@ -14,6 +13,7 @@ import {
 
 type TasksWorkspaceProps = {
   tasks: Task[]
+  categories: EventCategory[]
   loadStatus: 'loading' | 'ready' | 'error'
   loadError?: string
   selectedCategoryId?: string | null
@@ -37,6 +37,7 @@ const TASK_TABS: Array<{ id: TaskTab; label: string }> = [
 
 export default function TasksWorkspace({
   tasks,
+  categories,
   loadStatus,
   loadError = '',
   selectedCategoryId = null,
@@ -57,8 +58,6 @@ export default function TasksWorkspace({
   const [isSaving, setIsSaving] = useState(false)
   const [operationError, setOperationError] = useState('')
   const lastCreateTaskSignalRef = useRef(createTaskSignal)
-
-  const categories: EventCategory[] = getCategories()
 
   const visibleTasks = useMemo(() => {
     const categoryTasks = filterTasksByCategory(tasks, selectedCategoryId)

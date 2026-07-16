@@ -8,7 +8,7 @@ import {
 import type { WorkspaceId } from '../layout/Sidebar.tsx'
 import type { VoiceRuntimeStatus } from '../VoiceControl.tsx'
 import { getEvents } from '../../services/eventDataSource.ts'
-import { getCategories } from '../../utils/storage.ts'
+import type { EventCategory } from '../../types/calendar.ts'
 import type { Task } from '../../types/task.ts'
 
 type CommandPaletteProps = {
@@ -16,6 +16,7 @@ type CommandPaletteProps = {
   activeWorkspace: WorkspaceId
   voiceStatus: VoiceRuntimeStatus
   tasks: Task[]
+  categories: EventCategory[]
   onClose: () => void
   onNavigate: (workspace: WorkspaceId) => void
   onOpenNewEvent: () => void
@@ -73,6 +74,7 @@ export default function CommandPalette({
   activeWorkspace,
   voiceStatus,
   tasks,
+  categories,
   onClose,
   onNavigate,
   onOpenNewEvent,
@@ -209,7 +211,7 @@ export default function CommandPalette({
       : []
 
     const searchedCategories = normalizedQuery
-      ? getCategories()
+      ? categories
           .filter((category) =>
             `${category.name} ${category.description ?? ''}`
               .toLocaleLowerCase()
@@ -237,6 +239,7 @@ export default function CommandPalette({
     ]
   }, [
     activeWorkspace,
+    categories,
     normalizedQuery,
     onClose,
     onNavigate,

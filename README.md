@@ -181,6 +181,19 @@ PUT    /api/tasks/:id
 DELETE /api/tasks/:id
 ```
 
+Category 同样由 Backend 提供 CRUD API：
+
+```text
+GET    /api/categories
+GET    /api/categories/:id
+POST   /api/categories
+PUT    /api/categories/:id
+DELETE /api/categories/:id
+```
+
+删除 Category 不会删除关联 Event 或 Task；Backend 会在同一 SQLite 事务中将其
+`categoryId` 清空，使数据回到“未分类”状态。
+
 启动后在浏览器中打开：
 
 ```text
@@ -206,10 +219,11 @@ npm run build
 * 分类文件夹
 * 分类与日期的关联关系
 
-backend 模式下 Event 与 Task 均通过 C++ API 保存到 SQLite；分类和倒计时仍保持现有本地存储。
+backend 模式下 Event、Task 与 Category 均通过 C++ API 保存到 SQLite；倒计时和分类日期链接仍保持现有本地存储。
 首次升级时，旧版 `localStorage` Event 会在验证 Backend 可用后安全迁移到 SQLite。
 迁移成功后旧 Event 暂时保留为备份，但运行时只读写 Backend，不会双写。
 旧版 `voice-calendar:tasks` Task 也会通过独立迁移标记安全迁移；迁移成功后旧数据保留为备份，Task 运行时只读写 Backend。
+旧版 `voice-calendar:categories` Category 会保留原 ID 迁移，确保已有 Event/Task 的 `categoryId` 关联继续有效。
 `VITE_EVENT_DATA_SOURCE=local` 仅保留用于开发调试或紧急回退。
 
 ## 开发过程说明

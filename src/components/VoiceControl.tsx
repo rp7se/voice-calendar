@@ -10,14 +10,15 @@ import {
 } from '../services/eventDataSource.ts'
 import {
   addDateToCategory,
-  getCategories,
   getCountdowns,
   getDatesByCategory,
 } from '../utils/storage.ts'
 import { summarizeDay, summarizeNextSevenDays } from '../utils/scheduleSummary.ts'
 import { parseVoiceCommand } from '../utils/voiceCommandParser.ts'
+import type { EventCategory } from '../types/calendar.ts'
 
 type VoiceControlProps = {
+  categories: EventCategory[]
   onCalendarChange?: () => void
   onCategoryChange?: () => void
   listenSignal?: number
@@ -145,6 +146,7 @@ function formatCountdownResult(title: string, targetDate: string): string {
 }
 
 export default function VoiceControl({
+  categories,
   onCalendarChange,
   onCategoryChange,
   listenSignal = 0,
@@ -214,7 +216,6 @@ export default function VoiceControl({
       command.dateLabel &&
       command.categoryName
     ) {
-      const categories = getCategories()
       const category = categories.find(
         (item) =>
           item.name === command.categoryName ||

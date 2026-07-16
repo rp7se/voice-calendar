@@ -1,22 +1,28 @@
 import { useMemo, useState, type DragEvent, type FormEvent } from 'react'
+import { ApiError } from '../api/eventApi.ts'
 import type { CalendarEvent, EventCategory, EventType } from '../types/calendar.ts'
+import type { Task } from '../types/task.ts'
 import {
   getEvents,
   getEventsByCategory,
   getEventsByDate,
 } from '../services/eventDataSource.ts'
 import {
-  addCategory,
   addDateToCategory,
-  deleteCategory,
-  getCategories,
   getCategoryDateLinks,
   getDatesByCategory,
   removeDateFromCategory,
 } from '../utils/storage.ts'
 
 type CategoryPanelProps = {
-  onCategoriesChange?: () => void
+  categories: EventCategory[]
+  tasks: Task[]
+  loadStatus: 'loading' | 'ready' | 'error'
+  loadError?: string
+  onRetryLoad: () => void
+  onCreateCategory: (input: { name: string; description?: string }) => Promise<void>
+  onDeleteCategory: (id: string) => Promise<void>
+  onDateLinksChange?: () => void
 }
 
 const TYPE_LABELS: Record<EventType, string> = {
@@ -31,11 +37,16 @@ const EMPTY_FORM = {
   description: '',
 }
 
-function buildCategoryCounts(): Record<string, number> {
+function buildCategoryCounts(tasks: readonly Task[]): Record<string, number> {
   const counts: Record<string, number> = {}
   for (const event of getEvents()) {
     if (event.categoryId) {
       counts[event.categoryId] = (counts[event.categoryId] ?? 0) + 1
+    }
+  }
+  for (const task of tasks) {
+    if (task.categoryId) {
+      counts[task.categoryId] = (counts[task.categoryId] ?? 0) + 1
     }
   }
   return counts
@@ -71,63 +82,86 @@ function sortEventsByTime(events: CalendarEvent[]): CalendarEvent[] {
 }
 
 export default function CategoryPanel({
-  onCategoriesChange,
+  categories,
+  tasks,
+  loadStatus,
+  loadError = '',
+  onRetryLoad,
+  onCreateCategory,
+  onDeleteCategory,
+  onDateLinksChange,
 }: CategoryPanelProps) {
-  const [categories, setCategories] = useState<EventCategory[]>(() => getCategories())
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null)
   const [dropFeedback, setDropFeedback] = useState('')
+  const [operationError, setOperationError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null)
   const [, setDateLinksVersion] = useState(0)
 
-  const refreshCategories = () => {
-    const list = getCategories()
-    setCategories(list)
-    if (selectedCategoryId && !list.some((item) => item.id === selectedCategoryId)) {
-      setSelectedCategoryId(null)
-    }
-  }
+  const effectiveSelectedCategoryId =
+    selectedCategoryId && categories.some((item) => item.id === selectedCategoryId)
+      ? selectedCategoryId
+      : null
 
-  const categoryEvents = selectedCategoryId
-    ? getEventsByCategory(selectedCategoryId)
+  const categoryEvents = effectiveSelectedCategoryId
+    ? getEventsByCategory(effectiveSelectedCategoryId)
     : []
-  const categoryDates = selectedCategoryId ? getDatesByCategory(selectedCategoryId) : []
-  const categoryCounts = buildCategoryCounts()
+  const categoryDates = effectiveSelectedCategoryId
+    ? getDatesByCategory(effectiveSelectedCategoryId)
+    : []
+  const categoryCounts = buildCategoryCounts(tasks)
   const categoryDateCounts = buildCategoryDateCounts()
 
   const selectedCategory = useMemo(
-    () => categories.find((item) => item.id === selectedCategoryId) ?? null,
-    [categories, selectedCategoryId],
+    () => categories.find((item) => item.id === effectiveSelectedCategoryId) ?? null,
+    [categories, effectiveSelectedCategoryId],
   )
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!form.name.trim()) {
       return
     }
 
-    addCategory({
-      name: form.name.trim(),
-      description: form.description.trim() || undefined,
-    })
-
-    setForm(EMPTY_FORM)
-    refreshCategories()
-    onCategoriesChange?.()
+    setIsSaving(true)
+    setOperationError('')
+    try {
+      await onCreateCategory({
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+      })
+      setForm(EMPTY_FORM)
+    } catch (error) {
+      setOperationError(
+        error instanceof ApiError && error.status === 409
+          ? '已存在同名分类。'
+          : '分类创建失败，请确认分类服务是否正常运行。',
+      )
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleSelectCategory = (categoryId: string) => {
     setSelectedCategoryId(categoryId)
   }
 
-  const handleDeleteCategory = (categoryId: string) => {
-    deleteCategory(categoryId)
-    if (selectedCategoryId === categoryId) {
-      setSelectedCategoryId(null)
+  const handleDeleteCategory = async (categoryId: string) => {
+    setDeletingCategoryId(categoryId)
+    setOperationError('')
+    try {
+      await onDeleteCategory(categoryId)
+      if (effectiveSelectedCategoryId === categoryId) {
+        setSelectedCategoryId(null)
+      }
+      setDateLinksVersion((version) => version + 1)
+    } catch {
+      setOperationError('分类删除失败，原分类和关联数据已保留。')
+    } finally {
+      setDeletingCategoryId(null)
     }
-    refreshCategories()
-    setDateLinksVersion((version) => version + 1)
-    onCategoriesChange?.()
   }
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>, categoryId: string) => {
@@ -154,16 +188,16 @@ export default function CategoryPanel({
         : `已将 ${date} 加入 ${category.name}`,
     )
     setDateLinksVersion((version) => version + 1)
-    onCategoriesChange?.()
+    onDateLinksChange?.()
   }
 
   const handleRemoveDate = (date: string) => {
-    if (!selectedCategoryId) {
+    if (!effectiveSelectedCategoryId) {
       return
     }
-    removeDateFromCategory(selectedCategoryId, date)
+    removeDateFromCategory(effectiveSelectedCategoryId, date)
     setDateLinksVersion((version) => version + 1)
-    onCategoriesChange?.()
+    onDateLinksChange?.()
   }
 
   return (
@@ -172,7 +206,17 @@ export default function CategoryPanel({
         <h2 className="section-title">分类</h2>
       </header>
 
-      <form className="category-form" onSubmit={handleSubmit}>
+      {loadStatus === 'loading' && (
+        <p className="category-service-status" role="status">正在加载分类...</p>
+      )}
+      {loadStatus === 'error' && (
+        <div className="category-service-status category-service-status--error" role="alert">
+          <span>{loadError || '暂时无法连接分类服务。'}</span>
+          <button type="button" onClick={onRetryLoad}>重试</button>
+        </div>
+      )}
+
+      <form className="category-form" onSubmit={(event) => void handleSubmit(event)}>
         <h3 className="sidebar-form-title">新建</h3>
         <div className="form-row">
           <label htmlFor="category-name">名称 *</label>
@@ -197,8 +241,9 @@ export default function CategoryPanel({
             rows={2}
           />
         </div>
-        <button type="submit" className="form-submit-btn">
-          创建分类
+        {operationError && <p className="category-operation-error" role="alert">{operationError}</p>}
+        <button type="submit" className="form-submit-btn" disabled={isSaving}>
+          {isSaving ? '正在创建...' : '创建分类'}
         </button>
       </form>
 
@@ -211,7 +256,7 @@ export default function CategoryPanel({
           categories.map((category) => {
             const count = categoryCounts[category.id] ?? 0
             const dateCount = categoryDateCounts[category.id] ?? 0
-            const isSelected = selectedCategoryId === category.id
+            const isSelected = effectiveSelectedCategoryId === category.id
             const isDragOver = dragOverCategoryId === category.id
             return (
               <div
@@ -249,9 +294,10 @@ export default function CategoryPanel({
                 <button
                   type="button"
                   className="category-delete-btn"
-                  onClick={() => handleDeleteCategory(category.id)}
+                  onClick={() => void handleDeleteCategory(category.id)}
+                  disabled={deletingCategoryId === category.id}
                 >
-                  删除
+                  {deletingCategoryId === category.id ? '删除中...' : '删除'}
                 </button>
               </div>
             )
