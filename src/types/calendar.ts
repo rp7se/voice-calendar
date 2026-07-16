@@ -27,6 +27,7 @@ export type EventCategory = {
   name: string
   description?: string
   createdAt: string
+  updatedAt: string
 }
 
 export type CategoryDateLink = {
@@ -46,4 +47,4 @@ export type HolidayInfo = {
 
 export type CalendarEventInput = Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>
 export type CountdownItemInput = Omit<CountdownItem, 'id' | 'createdAt'>
-export type EventCategoryInput = Omit<EventCategory, 'id' | 'createdAt'>
+export type EventCategoryInput = Omit<EventCategory, 'id' | 'createdAt' | 'updatedAt'>

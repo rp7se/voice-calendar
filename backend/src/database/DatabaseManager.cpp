@@ -18,6 +18,7 @@ constexpr auto kDatabasePathEnv = "VOICECALENDAR_DB_PATH";
 constexpr auto kDefaultDatabaseFile = "voicecalendar.db";
 constexpr auto kCreateEventsMigration = "001_create_events.sql";
 constexpr auto kCreateTasksMigration = "002_create_tasks.sql";
+constexpr auto kCreateCategoriesMigration = "003_create_categories.sql";
 
 std::filesystem::path normalizePath(std::filesystem::path path)
 {
@@ -171,6 +172,7 @@ std::vector<std::filesystem::path> DatabaseManager::resolveMigrationPaths()
     return {
         migrationsRoot / kCreateEventsMigration,
         migrationsRoot / kCreateTasksMigration,
+        migrationsRoot / kCreateCategoriesMigration,
     };
 }
 
@@ -209,11 +211,11 @@ void DatabaseManager::verifySchema(const drogon::orm::DbClientPtr& client) const
 {
     const auto result = client->execSqlSync(
         "SELECT name FROM sqlite_master WHERE type = 'table' "
-        "AND name IN ('events', 'tasks');");
+        "AND name IN ('events', 'tasks', 'categories');");
 
-    if (result.size() != 2)
+    if (result.size() != 3)
     {
-        throw std::runtime_error("SQLite schema verification failed: events or tasks table is missing");
+        throw std::runtime_error("SQLite schema verification failed: a required table is missing");
     }
 }
 

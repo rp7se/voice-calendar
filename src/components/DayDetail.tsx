@@ -6,10 +6,10 @@ import {
   getEventErrorMessage,
   getEventsByDate,
 } from '../services/eventDataSource.ts'
-import { getCategories } from '../utils/storage.ts'
 
 type DayDetailProps = {
   selectedDate: string
+  categories: EventCategory[]
   onEventsChange?: () => void
   compact?: boolean
 }
@@ -71,6 +71,7 @@ function formatDuration(minutes: number): string {
 
 export default function DayDetail({
   selectedDate,
+  categories,
   onEventsChange,
   compact = false,
 }: DayDetailProps) {
@@ -83,8 +84,6 @@ export default function DayDetail({
   }
 
   const events = getEventsByDate(selectedDate)
-  const categories: EventCategory[] = getCategories()
-
   const groupedEvents = useMemo(() => {
     return TYPE_GROUPS.map((group) => ({
       ...group,

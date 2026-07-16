@@ -13,10 +13,10 @@ import {
   getEventsByDate,
   updateEvent,
 } from '../services/eventDataSource.ts'
-import { getCategories } from '../utils/storage.ts'
 
 type DayDetailModalProps = {
   selectedDate: string
+  categories: EventCategory[]
   isOpen: boolean
   onClose: () => void
   onEventsChange?: () => void
@@ -58,6 +58,7 @@ function sortEventsByTime(events: CalendarEvent[]): CalendarEvent[] {
 
 export default function DayDetailModal({
   selectedDate,
+  categories,
   isOpen,
   onClose,
   onEventsChange,
@@ -73,8 +74,6 @@ export default function DayDetailModal({
   }
 
   const events = getEventsByDate(selectedDate)
-  const categories: EventCategory[] = getCategories()
-
   const sortedEvents = useMemo(() => sortEventsByTime(events), [events])
 
   const resetEditor = () => {

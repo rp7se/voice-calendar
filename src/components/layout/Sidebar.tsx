@@ -1,9 +1,11 @@
-import { getCategories } from '../../utils/storage.ts'
+import type { EventCategory } from '../../types/calendar.ts'
 
 export type WorkspaceId = 'today' | 'calendar' | 'tasks' | 'insights' | 'settings'
 
 type SidebarProps = {
   activeWorkspace: WorkspaceId
+  categories: EventCategory[]
+  categoryLoadStatus?: 'loading' | 'ready' | 'error'
   selectedCategoryId?: string | null
   onNavigate: (workspace: WorkspaceId) => void
   onSelectCategory?: (categoryId: string | null) => void
@@ -19,12 +21,12 @@ const NAV_ITEMS: Array<{ id: WorkspaceId; label: string; eyebrow: string }> = [
 
 export default function Sidebar({
   activeWorkspace,
+  categories,
+  categoryLoadStatus = 'ready',
   selectedCategoryId = null,
   onNavigate,
   onSelectCategory,
 }: SidebarProps) {
-  const categories = getCategories()
-
   return (
     <aside className="app-sidebar" aria-label="VoiceCalendar navigation">
       <div className="app-sidebar-brand">
@@ -72,7 +74,11 @@ export default function Sidebar({
             <span className="app-sidebar-category-name">全部分类</span>
           </button>
 
-          {categories.length === 0 ? (
+          {categoryLoadStatus === 'error' ? (
+            <p className="app-sidebar-empty">分类服务暂不可用</p>
+          ) : categoryLoadStatus === 'loading' ? (
+            <p className="app-sidebar-empty">正在加载分类...</p>
+          ) : categories.length === 0 ? (
             <p className="app-sidebar-empty">No categories yet</p>
           ) : (
             categories.slice(0, 8).map((category) => (

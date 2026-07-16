@@ -57,6 +57,17 @@ export function getEventsByCategory(categoryId: string): CalendarEvent[] {
   return getEvents().filter((event) => event.categoryId === categoryId)
 }
 
+export function clearEventCategory(categoryId: string): void {
+  if (!isBackendEventDataSource()) {
+    return
+  }
+  backendEvents = backendEvents.map((event) =>
+    event.categoryId === categoryId
+      ? { ...event, categoryId: undefined }
+      : event,
+  )
+}
+
 export async function createEvent(event: CalendarEventInput): Promise<CalendarEvent> {
   if (!isBackendEventDataSource()) {
     return addLocalEvent(event)

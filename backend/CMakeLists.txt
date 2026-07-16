@@ -14,16 +14,20 @@ target_sources(voicecalendar_backend
   PRIVATE
     src/main.cpp
     src/controllers/EventController.cpp
+    src/controllers/CategoryController.cpp
     src/controllers/FreeTimeController.cpp
     src/controllers/HealthController.cpp
     src/controllers/SchedulingController.cpp
     src/controllers/TaskController.cpp
     src/database/DatabaseManager.cpp
     src/http/EventJson.cpp
+    src/http/CategoryJson.cpp
     src/http/TaskJson.cpp
     src/models/Event.cpp
+    src/models/Category.cpp
     src/models/Task.cpp
     src/repositories/EventRepository.cpp
+    src/repositories/CategoryRepository.cpp
     src/repositories/TaskRepository.cpp
     src/services/EventConflictService.cpp
     src/services/FreeTimeService.cpp

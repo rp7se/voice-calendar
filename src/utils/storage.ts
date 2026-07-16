@@ -4,17 +4,15 @@ import type {
   CountdownItem,
   CountdownItemInput,
   CategoryDateLink,
-  EventCategory,
-  EventCategoryInput,
 } from '../types/calendar.ts'
 
 export const LEGACY_EVENT_STORAGE_KEY = 'voice-calendar:events'
+export const LEGACY_CATEGORY_STORAGE_KEY = 'voice-calendar:categories'
 
 /** localStorage key 统一管理 */
 const STORAGE_KEYS = {
   EVENTS: LEGACY_EVENT_STORAGE_KEY,
   COUNTDOWNS: 'voice-calendar:countdowns',
-  CATEGORIES: 'voice-calendar:categories',
   CATEGORY_DATE_LINKS: 'voice-calendar:category-date-links',
 } as const
 
@@ -144,39 +142,6 @@ export function deleteCountdown(id: string): boolean {
   return true
 }
 
-// --- 分类 ---
-
-export function getCategories(): EventCategory[] {
-  return readFromStorage<EventCategory[]>(STORAGE_KEYS.CATEGORIES, [])
-}
-
-export function saveCategories(categories: EventCategory[]): void {
-  writeToStorage(STORAGE_KEYS.CATEGORIES, categories)
-}
-
-export function addCategory(categoryInput: EventCategoryInput): EventCategory {
-  const category: EventCategory = {
-    ...categoryInput,
-    id: createId(),
-    createdAt: nowIso(),
-  }
-  const categories = getCategories()
-  categories.push(category)
-  saveCategories(categories)
-  return category
-}
-
-export function deleteCategory(id: string): boolean {
-  const categories = getCategories()
-  const nextCategories = categories.filter((category) => category.id !== id)
-  if (nextCategories.length === categories.length) {
-    return false
-  }
-  saveCategories(nextCategories)
-  saveCategoryDateLinks(getCategoryDateLinks().filter((link) => link.categoryId !== id))
-  return true
-}
-
 // --- 分类日期关联 ---
 
 export function getCategoryDateLinks(): CategoryDateLink[] {
@@ -185,6 +150,12 @@ export function getCategoryDateLinks(): CategoryDateLink[] {
 
 export function saveCategoryDateLinks(links: CategoryDateLink[]): void {
   writeToStorage(STORAGE_KEYS.CATEGORY_DATE_LINKS, links)
+}
+
+export function deleteCategoryDateLinks(categoryId: string): void {
+  saveCategoryDateLinks(
+    getCategoryDateLinks().filter((link) => link.categoryId !== categoryId),
+  )
 }
 
 export function addDateToCategory(categoryId: string, date: string): CategoryDateLink {
