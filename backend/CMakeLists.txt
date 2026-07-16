@@ -19,6 +19,7 @@ target_sources(voicecalendar_backend
     src/http/EventJson.cpp
     src/models/Event.cpp
     src/repositories/EventRepository.cpp
+    src/services/EventConflictService.cpp
 )
 
 target_include_directories(voicecalendar_backend

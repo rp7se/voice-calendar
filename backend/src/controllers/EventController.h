@@ -1,6 +1,7 @@
 #pragma once
 
 #include "repositories/EventRepository.h"
+#include "services/EventConflictService.h"
 
 #include <drogon/HttpController.h>
 
@@ -43,6 +44,7 @@ public:
 
 private:
     repositories::EventRepository repository_;
+    services::EventConflictService conflictService_;
 };
 
 } // namespace voicecalendar::api

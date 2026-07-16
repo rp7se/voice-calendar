@@ -89,3 +89,6 @@ POST   /api/events
 PUT    /api/events/{id}
 DELETE /api/events/{id}
 ```
+
+`POST` and `PUT` reject overlapping same-day `[startTime, endTime)` ranges with
+HTTP `409` and the machine-readable error code `event_conflict`.
