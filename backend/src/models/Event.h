@@ -25,6 +25,7 @@ struct Event
     EventType type{EventType::Schedule};
     std::optional<std::string> categoryId;
     bool reminderEnabled{false};
+    std::optional<int> reminderMinutesBefore;
     std::string createdAt;
     std::string updatedAt;
 };

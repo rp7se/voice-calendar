@@ -10,6 +10,7 @@ export type CalendarEvent = {
   type: EventType
   categoryId?: string
   reminderEnabled: boolean
+  reminderMinutesBefore?: number | null
   createdAt: string
   updatedAt: string
 }

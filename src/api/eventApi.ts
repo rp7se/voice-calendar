@@ -15,6 +15,7 @@ export type BackendEventDto = {
   type: EventType
   categoryId?: string
   reminderEnabled: boolean
+  reminderMinutesBefore: number | null
   createdAt: string
   updatedAt: string
 }
@@ -28,6 +29,7 @@ export type EventWriteRequest = {
   type: EventType
   categoryId?: string
   reminderEnabled: boolean
+  reminderMinutesBefore: number | null
 }
 
 type ApiErrorBody = {
@@ -81,6 +83,25 @@ function parseBackendEvent(value: unknown): BackendEventDto {
   if (value.categoryId !== undefined && typeof value.categoryId !== 'string') {
     throw new ApiError(502, '日程服务返回了无效的分类标识。', 'invalid_response')
   }
+  if (
+    value.reminderMinutesBefore !== undefined &&
+    value.reminderMinutesBefore !== null &&
+    (!Number.isInteger(value.reminderMinutesBefore) ||
+      (value.reminderMinutesBefore as number) < 0 ||
+      (value.reminderMinutesBefore as number) > 10080)
+  ) {
+    throw new ApiError(502, '日程服务返回了无效的提醒时间。', 'invalid_response')
+  }
+
+  const reminderMinutesBefore =
+    value.reminderMinutesBefore === undefined
+      ? value.reminderEnabled
+        ? 0
+        : null
+      : (value.reminderMinutesBefore as number | null)
+  if (value.reminderEnabled !== (reminderMinutesBefore !== null)) {
+    throw new ApiError(502, '日程服务返回了不一致的提醒配置。', 'invalid_response')
+  }
 
   return {
     id: value.id as string,
@@ -92,6 +113,7 @@ function parseBackendEvent(value: unknown): BackendEventDto {
     type: value.type,
     categoryId: value.categoryId as string | undefined,
     reminderEnabled: value.reminderEnabled,
+    reminderMinutesBefore,
     createdAt: value.createdAt as string,
     updatedAt: value.updatedAt as string,
   }
@@ -111,6 +133,9 @@ export function toEventWriteRequest(event: CalendarEventInput): EventWriteReques
     type: event.type,
     categoryId: event.categoryId,
     reminderEnabled: event.reminderEnabled,
+    reminderMinutesBefore: event.reminderEnabled
+      ? (event.reminderMinutesBefore ?? 0)
+      : null,
   }
 }
 

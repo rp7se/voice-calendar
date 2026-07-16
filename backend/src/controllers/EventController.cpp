@@ -237,7 +237,11 @@ void EventController::updateEvent(
 
         parsed.event.createdAt = existing->createdAt;
         parsed.event.updatedAt = utcNowIso8601();
-        if (!repository_.update(parsed.event))
+        const auto reminderScheduleChanged =
+            parsed.event.date != existing->date ||
+            parsed.event.startTime != existing->startTime ||
+            parsed.event.reminderMinutesBefore != existing->reminderMinutesBefore;
+        if (!repository_.update(parsed.event, reminderScheduleChanged))
         {
             sendError(callback, drogon::k404NotFound, "event_not_found", "Event not found");
             return;

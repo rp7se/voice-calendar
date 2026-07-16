@@ -20,6 +20,7 @@ constexpr auto kCreateEventsMigration = "001_create_events.sql";
 constexpr auto kCreateTasksMigration = "002_create_tasks.sql";
 constexpr auto kCreateCategoriesMigration = "003_create_categories.sql";
 constexpr auto kTaskSchedulingRelationMigration = "004_add_task_scheduling_relation.sql";
+constexpr auto kEventRemindersMigration = "005_add_event_reminders.sql";
 
 std::filesystem::path normalizePath(std::filesystem::path path)
 {
@@ -104,6 +105,7 @@ void DatabaseManager::initialize()
         std::filesystem::create_directories(databasePath_.parent_path());
 
         client_ = createClient();
+        client_->execSqlSync("PRAGMA foreign_keys = ON;");
         runMigrations(client_);
         verifySchema(client_);
 
@@ -175,6 +177,7 @@ std::vector<std::filesystem::path> DatabaseManager::resolveMigrationPaths()
         migrationsRoot / kCreateTasksMigration,
         migrationsRoot / kCreateCategoriesMigration,
         migrationsRoot / kTaskSchedulingRelationMigration,
+        migrationsRoot / kEventRemindersMigration,
     };
 }
 
@@ -268,6 +271,28 @@ void DatabaseManager::verifySchema(const drogon::orm::DbClientPtr& client) const
     if (!hasSchedulingStatus || !hasScheduledEventId || !hasScheduledAt)
     {
         throw std::runtime_error("SQLite schema verification failed: task scheduling columns are missing");
+    }
+
+    const auto eventColumns = client->execSqlSync("PRAGMA table_info(events);");
+    bool hasReminderMinutesBefore = false;
+    for (const auto& row : eventColumns)
+    {
+        hasReminderMinutesBefore = hasReminderMinutesBefore ||
+            row["name"].as<std::string>() == "reminder_minutes_before";
+    }
+    if (!hasReminderMinutesBefore)
+    {
+        throw std::runtime_error(
+            "SQLite schema verification failed: event reminder column is missing");
+    }
+
+    const auto reminderTable = client->execSqlSync(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' "
+        "AND name = 'reminder_deliveries';");
+    if (reminderTable.empty())
+    {
+        throw std::runtime_error(
+            "SQLite schema verification failed: reminder deliveries table is missing");
     }
 }
 
