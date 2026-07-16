@@ -1,5 +1,6 @@
 import type { CalendarEvent } from '../../types/calendar.ts'
-import { getTasks, updateTask } from '../../utils/taskStorage.ts'
+import { useState } from 'react'
+import type { Task, TaskInput } from '../../types/task.ts'
 import {
   filterTasksByCategory,
   formatDeadline,
@@ -9,9 +10,9 @@ import {
 
 type TodayTasksProps = {
   events: CalendarEvent[]
+  tasks: Task[]
   selectedCategoryId?: string | null
-  refreshVersion?: number
-  onTasksChange?: () => void
+  onUpdateTask: (id: string, input: TaskInput) => Promise<void>
 }
 
 function getTaskLikeEvents(events: CalendarEvent[]) {
@@ -20,25 +21,29 @@ function getTaskLikeEvents(events: CalendarEvent[]) {
 
 export default function TodayTasks({
   events,
+  tasks,
   selectedCategoryId = null,
-  refreshVersion = 0,
-  onTasksChange,
+  onUpdateTask,
 }: TodayTasksProps) {
+  const [operationError, setOperationError] = useState('')
   const todayTasks = getTodayPendingTasks(
-    filterTasksByCategory(getTasks(), selectedCategoryId),
+    filterTasksByCategory(tasks, selectedCategoryId),
   )
   const taskLikeEvents = getTaskLikeEvents(events)
 
-  const handleCompleteTask = (taskId: string) => {
-    updateTask(taskId, { status: 'completed' })
-    onTasksChange?.()
+  const handleCompleteTask = async (task: Task) => {
+    setOperationError('')
+    try {
+      await onUpdateTask(task.id, { ...task, status: 'completed' })
+    } catch {
+      setOperationError('任务状态更新失败，原状态已保留。')
+    }
   }
 
   return (
     <section
       className="today-section today-tasks"
       aria-labelledby="today-tasks-title"
-      data-refresh-version={refreshVersion}
     >
       <div className="today-section-header">
         <div>
@@ -46,6 +51,8 @@ export default function TodayTasks({
           <h3 id="today-tasks-title">今日任务</h3>
         </div>
       </div>
+
+      {operationError && <p className="task-operation-error" role="alert">{operationError}</p>}
 
       {todayTasks.length > 0 ? (
         <ul className="today-task-list">
@@ -55,7 +62,7 @@ export default function TodayTasks({
                 type="button"
                 className="today-task-check today-task-check--button"
                 aria-label={`完成 ${task.title}`}
-                onClick={() => handleCompleteTask(task.id)}
+                onClick={() => void handleCompleteTask(task)}
               />
               <div>
                 <strong>{task.title}</strong>

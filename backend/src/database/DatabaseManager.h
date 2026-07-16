@@ -3,6 +3,7 @@
 #include <drogon/orm/DbClient.h>
 
 #include <filesystem>
+#include <vector>
 
 namespace voicecalendar::database
 {
@@ -26,8 +27,8 @@ private:
 
     static std::filesystem::path resolveDefaultDatabasePath();
     static std::filesystem::path resolveBackendRoot();
-    static std::filesystem::path resolveMigrationPath();
-    static std::string readMigrationSql();
+    static std::vector<std::filesystem::path> resolveMigrationPaths();
+    static std::string readMigrationSql(const std::filesystem::path& migrationPath);
 
     drogon::orm::DbClientPtr createClient() const;
     void runMigrations(const drogon::orm::DbClientPtr& client) const;

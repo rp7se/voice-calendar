@@ -8,14 +8,17 @@ import {
 type TasksContextPanelProps = {
   tasks: Task[]
   selectedCategoryName?: string | null
+  onAutoSchedule?: () => void
 }
 
 export default function TasksContextPanel({
   tasks,
   selectedCategoryName = null,
+  onAutoSchedule,
 }: TasksContextPanelProps) {
   const overview = getTaskOverview(tasks)
   const workloadMinutes = getTodayWorkloadMinutes(tasks)
+  const pendingCount = tasks.filter((task) => task.status === 'pending').length
 
   return (
     <div className="tasks-context-stack">
@@ -58,9 +61,13 @@ export default function TasksContextPanel({
       <section className="tasks-context-card tasks-auto-card">
         <span className="today-context-kicker">Auto Schedule</span>
         <h3>自动安排</h3>
-        <p>智能排程功能将在后续版本开放。</p>
-        <button type="button" disabled>
-          即将支持
+        <p>
+          {pendingCount > 0
+            ? `将安排当前范围内的 ${pendingCount} 个待完成任务。`
+            : '暂无需要安排的任务。'}
+        </p>
+        <button type="button" onClick={onAutoSchedule} disabled={pendingCount === 0}>
+          自动安排
         </button>
       </section>
     </div>
