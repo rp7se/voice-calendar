@@ -1,6 +1,6 @@
 import type { CalendarEvent } from '../types/calendar.ts'
+import { getEvents, getEventsByDate } from '../services/eventDataSource.ts'
 import { formatDate } from './date.ts'
-import { getEvents, getEventsByDate } from './storage.ts'
 
 export type ScheduleHighlight = {
   keyword: string

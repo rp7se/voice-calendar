@@ -1,5 +1,10 @@
-import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from 'react'
+import { useMemo, useState, type DragEvent, type FormEvent } from 'react'
 import type { CalendarEvent, EventCategory, EventType } from '../types/calendar.ts'
+import {
+  getEvents,
+  getEventsByCategory,
+  getEventsByDate,
+} from '../services/eventDataSource.ts'
 import {
   addCategory,
   addDateToCategory,
@@ -7,14 +12,10 @@ import {
   getCategories,
   getCategoryDateLinks,
   getDatesByCategory,
-  getEvents,
-  getEventsByCategory,
-  getEventsByDate,
   removeDateFromCategory,
 } from '../utils/storage.ts'
 
 type CategoryPanelProps = {
-  eventsVersion?: number
   onCategoriesChange?: () => void
 }
 
@@ -70,55 +71,29 @@ function sortEventsByTime(events: CalendarEvent[]): CalendarEvent[] {
 }
 
 export default function CategoryPanel({
-  eventsVersion = 0,
   onCategoriesChange,
 }: CategoryPanelProps) {
-  const [categories, setCategories] = useState<EventCategory[]>([])
+  const [categories, setCategories] = useState<EventCategory[]>(() => getCategories())
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
-  const [categoryEvents, setCategoryEvents] = useState<CalendarEvent[]>([])
-  const [categoryDates, setCategoryDates] = useState<string[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null)
   const [dropFeedback, setDropFeedback] = useState('')
-  const [dateLinksVersion, setDateLinksVersion] = useState(0)
+  const [, setDateLinksVersion] = useState(0)
 
   const refreshCategories = () => {
     const list = getCategories()
     setCategories(list)
     if (selectedCategoryId && !list.some((item) => item.id === selectedCategoryId)) {
       setSelectedCategoryId(null)
-      setCategoryEvents([])
-      setCategoryDates([])
     }
   }
 
-  const refreshCategoryDetails = (categoryId: string | null) => {
-    if (!categoryId) {
-      setCategoryEvents([])
-      setCategoryDates([])
-      return
-    }
-    setCategoryEvents(getEventsByCategory(categoryId))
-    setCategoryDates(getDatesByCategory(categoryId))
-  }
-
-  useEffect(() => {
-    refreshCategories()
-  }, [eventsVersion, dateLinksVersion])
-
-  useEffect(() => {
-    refreshCategoryDetails(selectedCategoryId)
-  }, [selectedCategoryId, eventsVersion, dateLinksVersion])
-
-  const categoryCounts = useMemo(
-    () => buildCategoryCounts(),
-    [categories, eventsVersion],
-  )
-
-  const categoryDateCounts = useMemo(
-    () => buildCategoryDateCounts(),
-    [categories, dateLinksVersion],
-  )
+  const categoryEvents = selectedCategoryId
+    ? getEventsByCategory(selectedCategoryId)
+    : []
+  const categoryDates = selectedCategoryId ? getDatesByCategory(selectedCategoryId) : []
+  const categoryCounts = buildCategoryCounts()
+  const categoryDateCounts = buildCategoryDateCounts()
 
   const selectedCategory = useMemo(
     () => categories.find((item) => item.id === selectedCategoryId) ?? null,
@@ -149,8 +124,6 @@ export default function CategoryPanel({
     deleteCategory(categoryId)
     if (selectedCategoryId === categoryId) {
       setSelectedCategoryId(null)
-      setCategoryEvents([])
-      setCategoryDates([])
     }
     refreshCategories()
     setDateLinksVersion((version) => version + 1)

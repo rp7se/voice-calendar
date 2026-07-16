@@ -22,6 +22,11 @@ import TodayOverview from './components/today/TodayOverview.tsx'
 import TodayWorkspace from './components/today/TodayWorkspace.tsx'
 import VoiceOrb from './components/voice/VoiceOrb.tsx'
 import { formatDate } from './utils/date.ts'
+import {
+  getEventErrorMessage,
+  isBackendEventDataSource,
+  loadEvents,
+} from './services/eventDataSource.ts'
 import { getCategories } from './utils/storage.ts'
 import { getTasks } from './utils/taskStorage.ts'
 import './App.css'
@@ -52,10 +57,12 @@ const DEFAULT_VOICE_STATUS: VoiceRuntimeStatus = {
   error: null,
 }
 
+type EventLoadStatus = 'ready' | 'loading' | 'error'
+
 function App() {
   const [selectedDate, setSelectedDate] = useState(() => formatDate(new Date()))
-  const [eventsVersion, setEventsVersion] = useState(0)
-  const [categoriesVersion, setCategoriesVersion] = useState(0)
+  const [, setEventsVersion] = useState(0)
+  const [, setCategoriesVersion] = useState(0)
   const [countdownVersion, setCountdownVersion] = useState(0)
   const [taskVersion, setTaskVersion] = useState(0)
   const [isDayDetailOpen, setIsDayDetailOpen] = useState(false)
@@ -67,6 +74,10 @@ function App() {
   const [voiceTextCommand, setVoiceTextCommand] = useState<VoiceExternalCommand | null>(null)
   const [voiceStatus, setVoiceStatus] = useState<VoiceRuntimeStatus>(DEFAULT_VOICE_STATUS)
   const [createTaskSignal, setCreateTaskSignal] = useState(0)
+  const [eventLoadStatus, setEventLoadStatus] = useState<EventLoadStatus>(() =>
+    isBackendEventDataSource() ? 'loading' : 'ready',
+  )
+  const [eventLoadError, setEventLoadError] = useState('')
 
   const selectedCategory =
     getCategories().find((category) => category.id === selectedCategoryId) ?? null
@@ -78,6 +89,19 @@ function App() {
 
   const handleEventsChange = () => {
     setEventsVersion((version) => version + 1)
+  }
+
+  const retryBackendEvents = async () => {
+    setEventLoadStatus('loading')
+    setEventLoadError('')
+    try {
+      await loadEvents()
+      setEventLoadStatus('ready')
+      setEventsVersion((version) => version + 1)
+    } catch (error) {
+      setEventLoadStatus('error')
+      setEventLoadError(getEventErrorMessage(error, '暂时无法连接日程服务。'))
+    }
   }
 
   const handleCategoriesChange = () => {
@@ -126,6 +150,31 @@ function App() {
     setActiveWorkspace('calendar')
     setIsDayDetailOpen(true)
   }
+
+  useEffect(() => {
+    if (!isBackendEventDataSource()) {
+      return
+    }
+
+    let cancelled = false
+    void loadEvents()
+      .then(() => {
+        if (!cancelled) {
+          setEventLoadStatus('ready')
+          setEventsVersion((version) => version + 1)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setEventLoadStatus('error')
+          setEventLoadError(getEventErrorMessage(error, '暂时无法连接日程服务。'))
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -188,11 +237,7 @@ function App() {
             打开 {selectedDate}
           </button>
         </div>
-        <CalendarView
-          selectedDate={selectedDate}
-          onSelectDate={handleSelectDate}
-          eventsVersion={eventsVersion}
-        />
+        <CalendarView selectedDate={selectedDate} onSelectDate={handleSelectDate} />
       </div>
     )
   }
@@ -210,6 +255,24 @@ function App() {
     <>
       <AmbientBackground />
       <main className="app">
+        {eventLoadStatus !== 'ready' && (
+          <div
+            className={`event-source-status event-source-status--${eventLoadStatus}`}
+            role={eventLoadStatus === 'error' ? 'alert' : 'status'}
+          >
+            <span>
+              {eventLoadStatus === 'loading' ? '正在加载日程...' : eventLoadError}
+            </span>
+            {eventLoadStatus === 'error' && (
+              <button
+                type="button"
+                onClick={() => void retryBackendEvents()}
+              >
+                重试
+              </button>
+            )}
+          </div>
+        )}
         <AppShell
           sidebar={
             <Sidebar
@@ -255,10 +318,7 @@ function App() {
                 onCountdownChange={handleCountdownChange}
                 onEnterFocusMode={() => setIsFocusMode(true)}
               />
-              <CategoryPanel
-                eventsVersion={eventsVersion}
-                onCategoriesChange={handleCategoriesChange}
-              />
+              <CategoryPanel onCategoriesChange={handleCategoriesChange} />
               {activeWorkspace !== 'tasks' && (
                 <section className="day-detail-hint panel-card">
                   <h2 className="section-title">日期详情</h2>
@@ -279,7 +339,6 @@ function App() {
           isOpen={isDayDetailOpen}
           onClose={() => setIsDayDetailOpen(false)}
           onEventsChange={handleEventsChange}
-          categoriesVersion={categoriesVersion}
         />
 
         <VoiceOrb

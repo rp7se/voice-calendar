@@ -1,6 +1,6 @@
 import type { CalendarEvent } from '../../types/calendar.ts'
+import { getEventsByDate } from '../../services/eventDataSource.ts'
 import { formatDate } from '../../utils/date.ts'
-import { getEventsByDate } from '../../utils/storage.ts'
 
 export function getTodayKey(date = new Date()): string {
   return formatDate(date)
