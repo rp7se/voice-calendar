@@ -1,5 +1,6 @@
 #include "http/EventJson.h"
 
+#include "models/Reminder.h"
 #include "utils/DateTimeUtils.h"
 
 #include <algorithm>
@@ -50,6 +51,9 @@ Json::Value eventToJson(const models::Event& event)
         json["categoryId"] = *event.categoryId;
     }
     json["reminderEnabled"] = event.reminderEnabled;
+    json["reminderMinutesBefore"] = event.reminderMinutesBefore
+        ? Json::Value(*event.reminderMinutesBefore)
+        : Json::Value(Json::nullValue);
     json["createdAt"] = event.createdAt;
     json["updatedAt"] = event.updatedAt;
     return json;
@@ -151,13 +155,47 @@ EventParseResult parseEventInput(
         event.categoryId = json["categoryId"].asString();
     }
 
+    std::optional<bool> reminderEnabled;
     if (json.isMember("reminderEnabled"))
     {
         if (!json["reminderEnabled"].isBool())
         {
             return invalid("reminderEnabled must be a boolean");
         }
-        event.reminderEnabled = json["reminderEnabled"].asBool();
+        reminderEnabled = json["reminderEnabled"].asBool();
+    }
+
+    const auto hasReminderMinutes = json.isMember("reminderMinutesBefore");
+    if (hasReminderMinutes && !json["reminderMinutesBefore"].isNull())
+    {
+        if (!json["reminderMinutesBefore"].isInt())
+        {
+            return invalid("reminderMinutesBefore must be null or an integer");
+        }
+        const auto minutes = json["reminderMinutesBefore"].asInt();
+        if (minutes < 0 || minutes > models::kMaximumReminderMinutesBefore)
+        {
+            return invalid("reminderMinutesBefore must be between 0 and 10080");
+        }
+        event.reminderMinutesBefore = minutes;
+    }
+
+    if (hasReminderMinutes)
+    {
+        event.reminderEnabled = event.reminderMinutesBefore.has_value();
+        if (reminderEnabled && *reminderEnabled != event.reminderEnabled)
+        {
+            return invalid(
+                "reminderEnabled must match whether reminderMinutesBefore is set");
+        }
+    }
+    else
+    {
+        event.reminderEnabled = reminderEnabled.value_or(false);
+        if (event.reminderEnabled)
+        {
+            event.reminderMinutesBefore = 0;
+        }
     }
 
     if (expectedId)

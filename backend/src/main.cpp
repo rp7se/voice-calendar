@@ -1,8 +1,10 @@
 #include "database/DatabaseManager.h"
+#include "services/ReminderService.h"
 
 #include <drogon/drogon.h>
 
 #include <iostream>
+#include <memory>
 
 int main()
 {
@@ -17,9 +19,13 @@ int main()
         return 1;
     }
 
-    drogon::app()
-        .addListener("127.0.0.1", 8080)
-        .run();
+    auto reminderService = std::make_shared<voicecalendar::services::ReminderService>();
+    auto& application = drogon::app();
+    application.registerBeginningAdvice([reminderService]() {
+        reminderService->start(drogon::app().getLoop());
+    });
+    application.addListener("127.0.0.1", 8080).run();
+    reminderService->stop();
 
     return 0;
 }

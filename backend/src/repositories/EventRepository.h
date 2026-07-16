@@ -19,7 +19,7 @@ public:
         const std::string& date,
         const std::optional<std::string>& excludeEventId = std::nullopt) const;
     models::Event create(const models::Event& event) const;
-    bool update(const models::Event& event) const;
+    bool update(const models::Event& event, bool clearPendingReminders = false) const;
     bool remove(const std::string& id) const;
 };
 

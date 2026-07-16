@@ -36,6 +36,10 @@ models::Event eventFromRow(const drogon::orm::Row& row)
         event.categoryId = row["category_id"].as<std::string>();
     }
     event.reminderEnabled = row["reminder_enabled"].as<int>() == 1;
+    if (!row["reminder_minutes_before"].isNull())
+    {
+        event.reminderMinutesBefore = row["reminder_minutes_before"].as<int>();
+    }
     event.createdAt = row["created_at"].as<std::string>();
     event.updatedAt = row["updated_at"].as<std::string>();
     return event;
@@ -46,7 +50,7 @@ std::vector<models::Event> EventRepository::findAll() const
 {
     const auto result = database::DatabaseManager::instance().client()->execSqlSync(
         "SELECT id, title, description, date, start_time, end_time, type, "
-        "category_id, reminder_enabled, created_at, updated_at "
+        "category_id, reminder_enabled, reminder_minutes_before, created_at, updated_at "
         "FROM events ORDER BY date ASC, start_time ASC, id ASC;");
 
     std::vector<models::Event> events;
@@ -62,7 +66,7 @@ std::vector<models::Event> EventRepository::findByDate(const std::string& date) 
 {
     const auto result = database::DatabaseManager::instance().client()->execSqlSync(
         "SELECT id, title, description, date, start_time, end_time, type, "
-        "category_id, reminder_enabled, created_at, updated_at "
+        "category_id, reminder_enabled, reminder_minutes_before, created_at, updated_at "
         "FROM events WHERE date = ? ORDER BY start_time ASC, id ASC;",
         date);
 
@@ -79,7 +83,7 @@ std::optional<models::Event> EventRepository::findById(const std::string& id) co
 {
     const auto result = database::DatabaseManager::instance().client()->execSqlSync(
         "SELECT id, title, description, date, start_time, end_time, type, "
-        "category_id, reminder_enabled, created_at, updated_at "
+        "category_id, reminder_enabled, reminder_minutes_before, created_at, updated_at "
         "FROM events WHERE id = ?;",
         id);
 
@@ -99,7 +103,7 @@ std::vector<models::Event> EventRepository::findPotentialConflicts(
     {
         result = database::DatabaseManager::instance().client()->execSqlSync(
             "SELECT id, title, description, date, start_time, end_time, type, "
-            "category_id, reminder_enabled, created_at, updated_at "
+            "category_id, reminder_enabled, reminder_minutes_before, created_at, updated_at "
             "FROM events WHERE date = ? AND end_time IS NOT NULL AND id <> ? "
             "ORDER BY start_time ASC, id ASC;",
             date,
@@ -109,7 +113,7 @@ std::vector<models::Event> EventRepository::findPotentialConflicts(
     {
         result = database::DatabaseManager::instance().client()->execSqlSync(
             "SELECT id, title, description, date, start_time, end_time, type, "
-            "category_id, reminder_enabled, created_at, updated_at "
+            "category_id, reminder_enabled, reminder_minutes_before, created_at, updated_at "
             "FROM events WHERE date = ? AND end_time IS NOT NULL "
             "ORDER BY start_time ASC, id ASC;",
             date);
@@ -128,8 +132,8 @@ models::Event EventRepository::create(const models::Event& event) const
 {
     const auto result = database::DatabaseManager::instance().client()->execSqlSync(
         "INSERT INTO events (id, title, description, date, start_time, end_time, "
-        "type, category_id, reminder_enabled, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+        "type, category_id, reminder_enabled, reminder_minutes_before, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
         event.id,
         event.title,
         event.description,
@@ -139,6 +143,7 @@ models::Event EventRepository::create(const models::Event& event) const
         models::toStorageValue(event.type),
         event.categoryId,
         event.reminderEnabled,
+        event.reminderMinutesBefore,
         event.createdAt,
         event.updatedAt);
 
@@ -149,12 +154,21 @@ models::Event EventRepository::create(const models::Event& event) const
     return event;
 }
 
-bool EventRepository::update(const models::Event& event) const
+bool EventRepository::update(const models::Event& event, bool clearPendingReminders) const
 {
-    const auto result = database::DatabaseManager::instance().client()->execSqlSync(
+    auto transaction = database::DatabaseManager::instance().client()->newTransaction(
+        drogon::orm::TransactionType::Immediate);
+    if (clearPendingReminders)
+    {
+        transaction->execSqlSync(
+            "DELETE FROM reminder_deliveries WHERE event_id = ? AND status = 'pending';",
+            event.id);
+    }
+
+    const auto result = transaction->execSqlSync(
         "UPDATE events SET title = ?, description = ?, date = ?, start_time = ?, "
         "end_time = ?, type = ?, category_id = ?, reminder_enabled = ?, "
-        "updated_at = ? WHERE id = ?;",
+        "reminder_minutes_before = ?, updated_at = ? WHERE id = ?;",
         event.title,
         event.description,
         event.date,
@@ -163,10 +177,16 @@ bool EventRepository::update(const models::Event& event) const
         models::toStorageValue(event.type),
         event.categoryId,
         event.reminderEnabled,
+        event.reminderMinutesBefore,
         event.updatedAt,
         event.id);
-
-    return result.affectedRows() == 1;
+    if (result.affectedRows() != 1)
+    {
+        transaction->rollback();
+        return false;
+    }
+    transaction.reset();
+    return true;
 }
 
 bool EventRepository::remove(const std::string& id) const
@@ -174,6 +194,9 @@ bool EventRepository::remove(const std::string& id) const
     auto transaction = database::DatabaseManager::instance().client()->newTransaction(
         drogon::orm::TransactionType::Immediate);
 
+    transaction->execSqlSync(
+        "DELETE FROM reminder_deliveries WHERE event_id = ?;",
+        id);
     transaction->execSqlSync(
         "UPDATE tasks SET scheduling_status = 'unscheduled', "
         "scheduled_event_id = NULL, scheduled_at = NULL, "
