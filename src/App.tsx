@@ -117,6 +117,11 @@ function App() {
 
   const handleEventsChange = () => {
     setEventsVersion((version) => version + 1)
+    void getBackendTasks()
+      .then(setTasks)
+      .catch(() => {
+        // Keep the current task state if an event refresh cannot reach the task service.
+      })
   }
 
   const retryBackendEvents = async () => {
@@ -219,6 +224,12 @@ function App() {
   const handleDeleteTask = async (id: string) => {
     await deleteBackendTask(id)
     setTasks((current) => current.filter((task) => task.id !== id))
+  }
+
+  const handleTaskSchedulingChange = (updated: Task) => {
+    setTasks((current) =>
+      current.map((task) => (task.id === updated.id ? updated : task)),
+    )
   }
 
   const handleToggleVoiceInput = () => {
@@ -376,6 +387,7 @@ function App() {
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
           onEventsChange={handleEventsChange}
+          onTaskSchedulingChange={handleTaskSchedulingChange}
           onOpenAutoSchedule={handleOpenAutoSchedule}
           onCloseAutoSchedule={() => setIsAutoScheduleOpen(false)}
         />

@@ -8,6 +8,7 @@
 #include <ctime>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 
 namespace voicecalendar::api
 {
@@ -185,6 +186,9 @@ void TaskController::updateTask(
         }
 
         parsed.task.createdAt = existing->createdAt;
+        parsed.task.schedulingStatus = existing->schedulingStatus;
+        parsed.task.scheduledEventId = existing->scheduledEventId;
+        parsed.task.scheduledAt = existing->scheduledAt;
         parsed.task.updatedAt = utcNowIso8601();
         if (!repository_.update(parsed.task))
         {
@@ -192,6 +196,92 @@ void TaskController::updateTask(
             return;
         }
         callback(jsonResponse(http::taskToJson(parsed.task), drogon::k200OK));
+    }
+    catch (const std::exception& error)
+    {
+        sendInternalError(callback, error);
+    }
+}
+
+void TaskController::linkTaskScheduling(
+    const drogon::HttpRequestPtr& request,
+    ResponseCallback&& callback,
+    std::string id) const
+{
+    const auto& json = request->getJsonObject();
+    if (!json)
+    {
+        sendError(callback, drogon::k400BadRequest, "invalid_json", "Request body must contain valid JSON");
+        return;
+    }
+    if (!json->isObject() || !json->isMember("eventId") || !(*json)["eventId"].isString())
+    {
+        sendError(callback, drogon::k400BadRequest, "invalid_scheduling_link", "eventId is required and must be a string");
+        return;
+    }
+
+    const auto eventId = (*json)["eventId"].asString();
+    if (eventId.find_first_not_of(" \t\r\n") == std::string::npos)
+    {
+        sendError(callback, drogon::k400BadRequest, "invalid_scheduling_link", "eventId must not be empty");
+        return;
+    }
+
+    try
+    {
+        const auto task = repository_.findById(id);
+        if (!task)
+        {
+            sendError(callback, drogon::k404NotFound, "task_not_found", "Task not found");
+            return;
+        }
+        if (task->schedulingStatus == models::TaskSchedulingStatus::Scheduled)
+        {
+            sendError(
+                callback,
+                drogon::k409Conflict,
+                "task_already_scheduled",
+                "Task is already linked to a scheduled event");
+            return;
+        }
+        if (!eventRepository_.findById(eventId))
+        {
+            sendError(callback, drogon::k404NotFound, "event_not_found", "Event not found");
+            return;
+        }
+
+        const auto scheduledAt = utcNowIso8601();
+        if (!repository_.linkScheduling(id, eventId, scheduledAt))
+        {
+            const auto currentTask = repository_.findById(id);
+            if (!currentTask)
+            {
+                sendError(callback, drogon::k404NotFound, "task_not_found", "Task not found");
+                return;
+            }
+            if (!eventRepository_.findById(eventId))
+            {
+                sendError(callback, drogon::k404NotFound, "event_not_found", "Event not found");
+                return;
+            }
+            if (currentTask->schedulingStatus != models::TaskSchedulingStatus::Scheduled)
+            {
+                throw std::runtime_error("Task scheduling link did not update an eligible task");
+            }
+            sendError(
+                callback,
+                drogon::k409Conflict,
+                "task_already_scheduled",
+                "Task is already linked to a scheduled event");
+            return;
+        }
+
+        const auto updated = repository_.findById(id);
+        if (!updated)
+        {
+            throw std::runtime_error("Task scheduling link succeeded but the task could not be reloaded");
+        }
+        callback(jsonResponse(http::taskToJson(*updated), drogon::k200OK));
     }
     catch (const std::exception& error)
     {

@@ -19,6 +19,7 @@ constexpr auto kDefaultDatabaseFile = "voicecalendar.db";
 constexpr auto kCreateEventsMigration = "001_create_events.sql";
 constexpr auto kCreateTasksMigration = "002_create_tasks.sql";
 constexpr auto kCreateCategoriesMigration = "003_create_categories.sql";
+constexpr auto kTaskSchedulingRelationMigration = "004_add_task_scheduling_relation.sql";
 
 std::filesystem::path normalizePath(std::filesystem::path path)
 {
@@ -173,6 +174,7 @@ std::vector<std::filesystem::path> DatabaseManager::resolveMigrationPaths()
         migrationsRoot / kCreateEventsMigration,
         migrationsRoot / kCreateTasksMigration,
         migrationsRoot / kCreateCategoriesMigration,
+        migrationsRoot / kTaskSchedulingRelationMigration,
     };
 }
 
@@ -198,11 +200,45 @@ drogon::orm::DbClientPtr DatabaseManager::createClient() const
 
 void DatabaseManager::runMigrations(const drogon::orm::DbClientPtr& client) const
 {
+    client->execSqlSync(
+        "CREATE TABLE IF NOT EXISTS schema_migrations ("
+        "name TEXT PRIMARY KEY, applied_at TEXT NOT NULL"
+        ");");
+
     for (const auto& migrationPath : resolveMigrationPaths())
     {
-        for (const auto& statement : splitMigrationStatements(readMigrationSql(migrationPath)))
+        const auto migrationName = migrationPath.filename().string();
+        const auto applied = client->execSqlSync(
+            "SELECT 1 FROM schema_migrations WHERE name = ?;",
+            migrationName);
+        if (!applied.empty())
         {
-            client->execSqlSync(statement);
+            continue;
+        }
+
+        client->execSqlSync("BEGIN IMMEDIATE;");
+        try
+        {
+            for (const auto& statement : splitMigrationStatements(readMigrationSql(migrationPath)))
+            {
+                client->execSqlSync(statement);
+            }
+            client->execSqlSync(
+                "INSERT INTO schema_migrations (name, applied_at) "
+                "VALUES (?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));",
+                migrationName);
+            client->execSqlSync("COMMIT;");
+        }
+        catch (...)
+        {
+            try
+            {
+                client->execSqlSync("ROLLBACK;");
+            }
+            catch (...)
+            {
+            }
+            throw;
         }
     }
 }
@@ -216,6 +252,22 @@ void DatabaseManager::verifySchema(const drogon::orm::DbClientPtr& client) const
     if (result.size() != 3)
     {
         throw std::runtime_error("SQLite schema verification failed: a required table is missing");
+    }
+
+    const auto taskColumns = client->execSqlSync("PRAGMA table_info(tasks);");
+    bool hasSchedulingStatus = false;
+    bool hasScheduledEventId = false;
+    bool hasScheduledAt = false;
+    for (const auto& row : taskColumns)
+    {
+        const auto name = row["name"].as<std::string>();
+        hasSchedulingStatus = hasSchedulingStatus || name == "scheduling_status";
+        hasScheduledEventId = hasScheduledEventId || name == "scheduled_event_id";
+        hasScheduledAt = hasScheduledAt || name == "scheduled_at";
+    }
+    if (!hasSchedulingStatus || !hasScheduledEventId || !hasScheduledAt)
+    {
+        throw std::runtime_error("SQLite schema verification failed: task scheduling columns are missing");
     }
 }
 

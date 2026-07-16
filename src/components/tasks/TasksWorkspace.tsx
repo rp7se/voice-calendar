@@ -25,6 +25,7 @@ type TasksWorkspaceProps = {
   onUpdateTask: (id: string, input: TaskInput) => Promise<void>
   onDeleteTask: (id: string) => Promise<void>
   onEventsChange?: () => void
+  onTaskSchedulingChange?: (task: Task) => void
   onOpenAutoSchedule?: () => void
   onCloseAutoSchedule?: () => void
 }
@@ -49,6 +50,7 @@ export default function TasksWorkspace({
   onUpdateTask,
   onDeleteTask,
   onEventsChange,
+  onTaskSchedulingChange,
   onOpenAutoSchedule,
   onCloseAutoSchedule,
 }: TasksWorkspaceProps) {
@@ -67,7 +69,8 @@ export default function TasksWorkspace({
   const schedulableTasks = useMemo(
     () =>
       filterTasksByCategory(tasks, selectedCategoryId).filter(
-        (task) => task.status === 'pending',
+        (task) =>
+          task.status === 'pending' && task.schedulingStatus === 'unscheduled',
       ),
     [selectedCategoryId, tasks],
   )
@@ -217,12 +220,13 @@ export default function TasksWorkspace({
         />
       )}
 
-      {isSchedulingOpen && schedulableTasks.length > 0 && (
+      {isSchedulingOpen && (
         <SchedulingPreviewModal
           tasks={schedulableTasks}
           categories={categories}
           selectedCategoryName={selectedCategoryName}
           onEventsChange={onEventsChange}
+          onTaskSchedulingChange={onTaskSchedulingChange}
           onClose={() => onCloseAutoSchedule?.()}
         />
       )}

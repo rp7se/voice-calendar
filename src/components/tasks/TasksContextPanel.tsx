@@ -18,7 +18,10 @@ export default function TasksContextPanel({
 }: TasksContextPanelProps) {
   const overview = getTaskOverview(tasks)
   const workloadMinutes = getTodayWorkloadMinutes(tasks)
-  const pendingCount = tasks.filter((task) => task.status === 'pending').length
+  const pendingCount = tasks.filter(
+    (task) =>
+      task.status === 'pending' && task.schedulingStatus === 'unscheduled',
+  ).length
 
   return (
     <div className="tasks-context-stack">
@@ -63,7 +66,7 @@ export default function TasksContextPanel({
         <h3>自动安排</h3>
         <p>
           {pendingCount > 0
-            ? `将安排当前范围内的 ${pendingCount} 个待完成任务。`
+            ? `将安排当前范围内的 ${pendingCount} 个未安排任务。`
             : '暂无需要安排的任务。'}
         </p>
         <button type="button" onClick={onAutoSchedule} disabled={pendingCount === 0}>

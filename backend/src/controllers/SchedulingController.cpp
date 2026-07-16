@@ -207,6 +207,20 @@ SchedulingRequestParseResult parseSchedulingRequest(const Json::Value& json)
         }
         task.priority = *priority;
 
+        if (value.isMember("schedulingStatus"))
+        {
+            if (!value["schedulingStatus"].isString() ||
+                (value["schedulingStatus"].asString() != "unscheduled" &&
+                 value["schedulingStatus"].asString() != "scheduled"))
+            {
+                return invalid("Task schedulingStatus must be unscheduled or scheduled");
+            }
+            if (value["schedulingStatus"].asString() == "scheduled")
+            {
+                continue;
+            }
+        }
+
         if (value.isMember("deadlineDate") && !value["deadlineDate"].isNull())
         {
             if (!value["deadlineDate"].isString() ||
