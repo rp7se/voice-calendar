@@ -16,12 +16,14 @@ target_sources(voicecalendar_backend
     src/controllers/EventController.cpp
     src/controllers/FreeTimeController.cpp
     src/controllers/HealthController.cpp
+    src/controllers/SchedulingController.cpp
     src/database/DatabaseManager.cpp
     src/http/EventJson.cpp
     src/models/Event.cpp
     src/repositories/EventRepository.cpp
     src/services/EventConflictService.cpp
     src/services/FreeTimeService.cpp
+    src/services/TaskSchedulerService.cpp
     src/utils/DateTimeUtils.cpp
 )
 
