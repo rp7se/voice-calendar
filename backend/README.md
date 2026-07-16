@@ -15,6 +15,8 @@ VoiceCalendar C++ backend skeleton for PR25.
 - 启动本地 HTTP Server
 - 监听 `127.0.0.1:8080`
 - 提供 `GET /api/health`
+- 启动时初始化 SQLite 数据库
+- 自动创建 `events` 表
 
 ## 环境要求
 
@@ -33,6 +35,22 @@ cmake -S backend -B backend/build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOL
 ```
 
 依赖由 `backend/vcpkg.json` 声明，CMake configure 阶段会通过 vcpkg manifest mode 安装项目依赖。
+
+## 数据库
+
+默认数据库路径：
+
+```text
+backend/data/voicecalendar.db
+```
+
+可通过环境变量覆盖：
+
+```powershell
+$env:VOICECALENDAR_DB_PATH = "backend/data/dev.db"
+```
+
+数据库文件、WAL 和 SHM 文件不会提交到 Git；`backend/data/.gitkeep` 仅用于保留目录。
 
 ## 编译
 

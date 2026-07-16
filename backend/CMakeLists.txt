@@ -14,6 +14,8 @@ target_sources(voicecalendar_backend
   PRIVATE
     src/main.cpp
     src/controllers/HealthController.cpp
+    src/database/DatabaseManager.cpp
+    src/models/Event.cpp
 )
 
 target_include_directories(voicecalendar_backend
