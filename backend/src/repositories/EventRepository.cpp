@@ -72,6 +72,40 @@ std::optional<models::Event> EventRepository::findById(const std::string& id) co
     return eventFromRow(result.front());
 }
 
+std::vector<models::Event> EventRepository::findPotentialConflicts(
+    const std::string& date,
+    const std::optional<std::string>& excludeEventId) const
+{
+    drogon::orm::Result result;
+    if (excludeEventId)
+    {
+        result = database::DatabaseManager::instance().client()->execSqlSync(
+            "SELECT id, title, description, date, start_time, end_time, type, "
+            "category_id, reminder_enabled, created_at, updated_at "
+            "FROM events WHERE date = ? AND end_time IS NOT NULL AND id <> ? "
+            "ORDER BY start_time ASC, id ASC;",
+            date,
+            *excludeEventId);
+    }
+    else
+    {
+        result = database::DatabaseManager::instance().client()->execSqlSync(
+            "SELECT id, title, description, date, start_time, end_time, type, "
+            "category_id, reminder_enabled, created_at, updated_at "
+            "FROM events WHERE date = ? AND end_time IS NOT NULL "
+            "ORDER BY start_time ASC, id ASC;",
+            date);
+    }
+
+    std::vector<models::Event> events;
+    events.reserve(result.size());
+    for (const auto& row : result)
+    {
+        events.push_back(eventFromRow(row));
+    }
+    return events;
+}
+
 models::Event EventRepository::create(const models::Event& event) const
 {
     const auto result = database::DatabaseManager::instance().client()->execSqlSync(

@@ -44,6 +44,27 @@ void sendInternalError(ResponseCallback& callback, const std::exception& error)
         "An internal server error occurred");
 }
 
+void sendConflict(
+    ResponseCallback& callback,
+    const std::vector<models::Event>& conflicts)
+{
+    Json::Value body(Json::objectValue);
+    body["error"] = "event_conflict";
+    body["message"] = "The event conflicts with an existing event";
+    body["conflicts"] = Json::Value(Json::arrayValue);
+    for (const auto& event : conflicts)
+    {
+        Json::Value conflict(Json::objectValue);
+        conflict["id"] = event.id;
+        conflict["title"] = event.title;
+        conflict["date"] = event.date;
+        conflict["startTime"] = event.startTime;
+        conflict["endTime"] = *event.endTime;
+        body["conflicts"].append(std::move(conflict));
+    }
+    callback(jsonResponse(std::move(body), drogon::k409Conflict));
+}
+
 std::string utcNowIso8601()
 {
     const auto now = std::chrono::system_clock::now();
@@ -132,6 +153,24 @@ void EventController::createEvent(
 
     try
     {
+        const auto conflictCheck = conflictService_.findConflicts(
+            repository_,
+            parsed.event);
+        if (!conflictCheck.validTimeRange)
+        {
+            sendError(
+                callback,
+                drogon::k400BadRequest,
+                "invalid_time_range",
+                "Start time must be earlier than end time");
+            return;
+        }
+        if (!conflictCheck.conflicts.empty())
+        {
+            sendConflict(callback, conflictCheck.conflicts);
+            return;
+        }
+
         parsed.event.id = drogon::utils::getUuid();
         parsed.event.createdAt = utcNowIso8601();
         parsed.event.updatedAt = parsed.event.createdAt;
@@ -174,6 +213,25 @@ void EventController::updateEvent(
         if (!parsed.valid)
         {
             sendError(callback, drogon::k400BadRequest, "invalid_event", parsed.errorMessage);
+            return;
+        }
+
+        const auto conflictCheck = conflictService_.findConflicts(
+            repository_,
+            parsed.event,
+            id);
+        if (!conflictCheck.validTimeRange)
+        {
+            sendError(
+                callback,
+                drogon::k400BadRequest,
+                "invalid_time_range",
+                "Start time must be earlier than end time");
+            return;
+        }
+        if (!conflictCheck.conflicts.empty())
+        {
+            sendConflict(callback, conflictCheck.conflicts);
             return;
         }
 
