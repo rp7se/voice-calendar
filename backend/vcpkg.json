@@ -2,6 +2,11 @@
   "name": "voicecalendar-backend",
   "version-string": "0.1.0",
   "dependencies": [
-    "drogon"
+    {
+      "name": "drogon",
+      "features": [
+        "sqlite3"
+      ]
+    }
   ]
 }
