@@ -1,8 +1,15 @@
 import { ApiError } from './eventApi.ts'
-import type { Task, TaskInput, TaskPriority, TaskStatus } from '../types/task.ts'
+import type {
+  Task,
+  TaskInput,
+  TaskPriority,
+  TaskSchedulingStatus,
+  TaskStatus,
+} from '../types/task.ts'
 
 const TASK_STATUSES: TaskStatus[] = ['pending', 'completed']
 const TASK_PRIORITIES: TaskPriority[] = ['high', 'medium', 'low']
+const TASK_SCHEDULING_STATUSES: TaskSchedulingStatus[] = ['unscheduled', 'scheduled']
 const CONFIGURED_API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || '/api'
 const API_BASE_URL = CONFIGURED_API_BASE_URL.replace(/\/$/, '')
 const TASKS_URL = `${API_BASE_URL}/tasks`
@@ -37,6 +44,13 @@ function isTaskPriority(value: unknown): value is TaskPriority {
   return typeof value === 'string' && TASK_PRIORITIES.includes(value as TaskPriority)
 }
 
+function isTaskSchedulingStatus(value: unknown): value is TaskSchedulingStatus {
+  return (
+    typeof value === 'string' &&
+    TASK_SCHEDULING_STATUSES.includes(value as TaskSchedulingStatus)
+  )
+}
+
 function parseBackendTask(value: unknown): BackendTaskDto {
   if (!isRecord(value)) {
     throw new ApiError(502, '任务服务返回了无法识别的数据。', 'invalid_response')
@@ -46,7 +60,8 @@ function parseBackendTask(value: unknown): BackendTaskDto {
   if (
     requiredStrings.some((field) => typeof value[field] !== 'string') ||
     !isTaskStatus(value.status) ||
-    !isTaskPriority(value.priority)
+    !isTaskPriority(value.priority) ||
+    !isTaskSchedulingStatus(value.schedulingStatus)
   ) {
     throw new ApiError(502, '任务服务返回了不完整的数据。', 'invalid_response')
   }
@@ -63,6 +78,20 @@ function parseBackendTask(value: unknown): BackendTaskDto {
   ) {
     throw new ApiError(502, '任务服务返回了无效的预计耗时。', 'invalid_response')
   }
+  if (
+    (value.scheduledEventId !== null && typeof value.scheduledEventId !== 'string') ||
+    (value.scheduledAt !== null && typeof value.scheduledAt !== 'string')
+  ) {
+    throw new ApiError(502, '任务服务返回了无效的排程关联。', 'invalid_response')
+  }
+  if (
+    (value.schedulingStatus === 'scheduled' &&
+      (typeof value.scheduledEventId !== 'string' || typeof value.scheduledAt !== 'string')) ||
+    (value.schedulingStatus === 'unscheduled' &&
+      (value.scheduledEventId !== null || value.scheduledAt !== null))
+  ) {
+    throw new ApiError(502, '任务服务返回了不一致的排程状态。', 'invalid_response')
+  }
 
   return {
     id: value.id as string,
@@ -73,6 +102,9 @@ function parseBackendTask(value: unknown): BackendTaskDto {
     deadlineTime: value.deadlineTime as string | undefined,
     estimatedDurationMinutes: value.estimatedDurationMinutes as number | undefined,
     categoryId: value.categoryId as string | undefined,
+    schedulingStatus: value.schedulingStatus,
+    scheduledEventId: value.scheduledEventId,
+    scheduledAt: value.scheduledAt,
     createdAt: value.createdAt as string,
     updatedAt: value.updatedAt as string,
   }
@@ -162,6 +194,17 @@ export async function updateTask(id: string, input: TaskInput): Promise<Task> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(toTaskWriteRequest(input)),
   }))
+}
+
+export async function linkTaskScheduling(id: string, eventId: string): Promise<Task> {
+  return parseBackendTask(await requestJson(
+    `${TASKS_URL}/${encodeURIComponent(id)}/scheduling`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId }),
+    },
+  ))
 }
 
 export async function deleteTask(id: string): Promise<void> {

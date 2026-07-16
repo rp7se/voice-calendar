@@ -52,4 +52,23 @@ std::optional<TaskPriority> taskPriorityFromStorageValue(const std::string& valu
     return std::nullopt;
 }
 
+std::string toStorageValue(TaskSchedulingStatus status)
+{
+    return status == TaskSchedulingStatus::Scheduled ? "scheduled" : "unscheduled";
+}
+
+std::optional<TaskSchedulingStatus> taskSchedulingStatusFromStorageValue(
+    const std::string& value)
+{
+    if (value == "unscheduled")
+    {
+        return TaskSchedulingStatus::Unscheduled;
+    }
+    if (value == "scheduled")
+    {
+        return TaskSchedulingStatus::Scheduled;
+    }
+    return std::nullopt;
+}
+
 } // namespace voicecalendar::models

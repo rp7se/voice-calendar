@@ -66,6 +66,9 @@ export default function TaskList({
               <span>{formatDeadline(task)}</span>
               <span>{formatDuration(task.estimatedDurationMinutes)}</span>
               <span>{getCategoryName(categories, task.categoryId)}</span>
+              {task.schedulingStatus === 'scheduled' && (
+                <span className="task-scheduling-status">已安排</span>
+              )}
             </span>
           </button>
 

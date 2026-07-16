@@ -41,7 +41,12 @@ function jsonResponse(body, status = 200) {
 }
 
 function createBackend(initialTasks = [], failedPostAttempts = [], failGet = false) {
-  const tasks = initialTasks.map((task) => ({ ...task }))
+  const tasks = initialTasks.map((task) => ({
+    ...task,
+    schedulingStatus: 'unscheduled',
+    scheduledEventId: null,
+    scheduledAt: null,
+  }))
   const failures = new Set(failedPostAttempts)
   let posts = 0
 
@@ -72,6 +77,9 @@ function createBackend(initialTasks = [], failedPostAttempts = [], failGet = fal
         const task = {
           ...request,
           id: request.id ?? `backend-${tasks.length + 1}`,
+          schedulingStatus: 'unscheduled',
+          scheduledEventId: null,
+          scheduledAt: null,
           createdAt: timestamp,
           updatedAt: timestamp,
         }

@@ -54,6 +54,13 @@ Json::Value taskToJson(const models::Task& task)
     {
         json["categoryId"] = *task.categoryId;
     }
+    json["schedulingStatus"] = models::toStorageValue(task.schedulingStatus);
+    json["scheduledEventId"] = task.scheduledEventId
+        ? Json::Value(*task.scheduledEventId)
+        : Json::Value(Json::nullValue);
+    json["scheduledAt"] = task.scheduledAt
+        ? Json::Value(*task.scheduledAt)
+        : Json::Value(Json::nullValue);
     json["createdAt"] = task.createdAt;
     json["updatedAt"] = task.updatedAt;
     return json;

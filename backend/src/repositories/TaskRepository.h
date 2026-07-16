@@ -16,6 +16,10 @@ public:
     std::optional<models::Task> findById(const std::string& id) const;
     models::Task create(const models::Task& task) const;
     bool update(const models::Task& task) const;
+    bool linkScheduling(
+        const std::string& id,
+        const std::string& eventId,
+        const std::string& scheduledAt) const;
     bool remove(const std::string& id) const;
 };
 

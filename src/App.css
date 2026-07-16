@@ -1363,6 +1363,12 @@
   color: var(--color-text-muted);
 }
 
+.task-item-meta .task-scheduling-status {
+  border-color: rgba(74, 222, 128, 0.22);
+  background: rgba(20, 83, 45, 0.12);
+  color: var(--color-success);
+}
+
 .task-delete-btn {
   min-height: 32px;
   color: var(--color-text-muted);

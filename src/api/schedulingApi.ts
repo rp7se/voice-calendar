@@ -1,5 +1,10 @@
 import { ApiError } from './eventApi.ts'
-import type { Task, TaskPriority, TaskStatus } from '../types/task.ts'
+import type {
+  Task,
+  TaskPriority,
+  TaskSchedulingStatus,
+  TaskStatus,
+} from '../types/task.ts'
 
 const CONFIGURED_API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || '/api'
 const API_BASE_URL = CONFIGURED_API_BASE_URL.replace(/\/$/, '')
@@ -10,6 +15,7 @@ export type SchedulingTaskDto = {
   title: string
   status: TaskStatus
   priority: TaskPriority
+  schedulingStatus: TaskSchedulingStatus
   deadlineDate?: string
   deadlineTime?: string
   estimatedDurationMinutes?: number
@@ -176,6 +182,7 @@ export function toSchedulingTaskDto(task: Task): SchedulingTaskDto {
     title: task.title,
     status: task.status,
     priority: task.priority,
+    schedulingStatus: task.schedulingStatus,
   }
 
   if (task.deadlineDate) {

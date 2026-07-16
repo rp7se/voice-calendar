@@ -2,6 +2,7 @@
 
 #include "database/DatabaseManager.h"
 
+#include <drogon/orm/DbClient.h>
 #include <drogon/orm/Field.h>
 
 #include <stdexcept>
@@ -170,10 +171,26 @@ bool EventRepository::update(const models::Event& event) const
 
 bool EventRepository::remove(const std::string& id) const
 {
-    const auto result = database::DatabaseManager::instance().client()->execSqlSync(
+    auto transaction = database::DatabaseManager::instance().client()->newTransaction(
+        drogon::orm::TransactionType::Immediate);
+
+    transaction->execSqlSync(
+        "UPDATE tasks SET scheduling_status = 'unscheduled', "
+        "scheduled_event_id = NULL, scheduled_at = NULL, "
+        "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
+        "WHERE scheduled_event_id = ?;",
+        id);
+    const auto result = transaction->execSqlSync(
         "DELETE FROM events WHERE id = ?;",
         id);
-    return result.affectedRows() == 1;
+    if (result.affectedRows() != 1)
+    {
+        transaction->rollback();
+        return false;
+    }
+
+    transaction.reset();
+    return true;
 }
 
 } // namespace voicecalendar::repositories

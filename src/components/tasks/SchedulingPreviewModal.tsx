@@ -6,6 +6,7 @@ import {
   type SchedulingPreviewResponse,
 } from '../../api/schedulingApi.ts'
 import { ApiError } from '../../api/eventApi.ts'
+import { linkTaskScheduling } from '../../api/taskApi.ts'
 import { createEvent } from '../../services/eventDataSource.ts'
 import type { EventCategory } from '../../types/calendar.ts'
 import type { Task } from '../../types/task.ts'
@@ -17,19 +18,21 @@ type SchedulingPreviewModalProps = {
   categories: EventCategory[]
   selectedCategoryName?: string | null
   onEventsChange?: () => void
+  onTaskSchedulingChange?: (task: Task) => void
   onClose: () => void
 }
 
-type CreationFailure = {
+type ConfirmationFailure = {
   taskId: string
   title: string
   message: string
-  isConflict: boolean
+  stage: 'event' | 'link'
 }
 
 type ConfirmationResult = {
   successCount: number
-  failures: CreationFailure[]
+  eventCreatedCount: number
+  failures: ConfirmationFailure[]
 }
 
 const UNSCHEDULED_REASON_LABELS: Record<string, string> = {
@@ -54,13 +57,13 @@ function getPreviewErrorMessage(error: unknown): string {
   return error.message
 }
 
-function getCreationFailure(error: unknown, scheduled: ScheduledTaskDto): CreationFailure {
+function getCreationFailure(error: unknown, scheduled: ScheduledTaskDto): ConfirmationFailure {
   if (error instanceof ApiError && error.status === 409) {
     return {
       taskId: scheduled.taskId,
       title: scheduled.title,
       message: '该时间段与新日程发生冲突',
-      isConflict: true,
+      stage: 'event',
     }
   }
 
@@ -73,7 +76,23 @@ function getCreationFailure(error: unknown, scheduled: ScheduledTaskDto): Creati
         : error instanceof ApiError && error.status === 400
           ? '创建日程所需的数据无效'
           : '创建该日程失败',
-    isConflict: false,
+    stage: 'event',
+  }
+}
+
+function getLinkFailure(error: unknown, scheduled: ScheduledTaskDto): ConfirmationFailure {
+  const detail =
+    error instanceof ApiError && error.code === 'task_already_scheduled'
+      ? '任务已经安排，原有关联未被覆盖'
+      : error instanceof ApiError && error.status === 404
+        ? '任务或日程已不存在'
+        : '日程已创建，但任务关联更新失败；请先处理已创建日程后再重试排程'
+
+  return {
+    taskId: scheduled.taskId,
+    title: scheduled.title,
+    message: `日程已创建，但任务关联更新失败：${detail}`,
+    stage: 'link',
   }
 }
 
@@ -86,8 +105,10 @@ export default function SchedulingPreviewModal({
   categories,
   selectedCategoryName = null,
   onEventsChange,
+  onTaskSchedulingChange,
   onClose,
 }: SchedulingPreviewModalProps) {
+  const [schedulingTasks] = useState(() => tasks)
   const [date, setDate] = useState(() => formatDate(new Date()))
   const [rangeStart, setRangeStart] = useState('08:00')
   const [rangeEnd, setRangeEnd] = useState('22:00')
@@ -101,8 +122,8 @@ export default function SchedulingPreviewModal({
   const dateInputRef = useRef<HTMLInputElement>(null)
 
   const taskById = useMemo(
-    () => new Map(tasks.map((task) => [task.id, task])),
-    [tasks],
+    () => new Map(schedulingTasks.map((task) => [task.id, task])),
+    [schedulingTasks],
   )
   const categoryById = useMemo(
     () => new Map(categories.map((category) => [category.id, category.name])),
@@ -149,7 +170,7 @@ export default function SchedulingPreviewModal({
       const result = await previewSchedule({
         date,
         range: { start: rangeStart, end: rangeEnd },
-        tasks: tasks.map(toSchedulingTaskDto),
+        tasks: schedulingTasks.map(toSchedulingTaskDto),
       })
       setPreview(result)
       setConfirmationResult(null)
@@ -169,13 +190,15 @@ export default function SchedulingPreviewModal({
     setIsConfirming(true)
     setIsConfirmed(true)
     setErrorMessage('')
-    const failures: CreationFailure[] = []
+    const failures: ConfirmationFailure[] = []
     let successCount = 0
+    let eventCreatedCount = 0
 
     for (const scheduled of preview.scheduled) {
       const sourceTask = taskById.get(scheduled.taskId)
+      let createdEvent
       try {
-        await createEvent({
+        createdEvent = await createEvent({
           title: scheduled.title,
           description: '由任务自动安排生成',
           date: preview.date,
@@ -185,16 +208,25 @@ export default function SchedulingPreviewModal({
           categoryId: sourceTask?.categoryId,
           reminderEnabled: false,
         })
-        successCount += 1
+        eventCreatedCount += 1
       } catch (error) {
         failures.push(getCreationFailure(error, scheduled))
+        continue
+      }
+
+      try {
+        const updatedTask = await linkTaskScheduling(scheduled.taskId, createdEvent.id)
+        onTaskSchedulingChange?.(updatedTask)
+        successCount += 1
+      } catch (error) {
+        failures.push(getLinkFailure(error, scheduled))
       }
     }
 
-    if (successCount > 0) {
+    if (eventCreatedCount > 0) {
       onEventsChange?.()
     }
-    setConfirmationResult({ successCount, failures })
+    setConfirmationResult({ successCount, eventCreatedCount, failures })
     setIsConfirming(false)
   }
 
@@ -220,11 +252,11 @@ export default function SchedulingPreviewModal({
         {!preview ? (
           <form className="scheduling-setup" onSubmit={(event) => void handlePreview(event)}>
             <div className="scheduling-scope-note">
-              <strong>将安排 {tasks.length} 个任务</strong>
+              <strong>将安排 {schedulingTasks.length} 个任务</strong>
               <span>
                 {selectedCategoryName
-                  ? `范围：${selectedCategoryName}分类中的全部待完成任务`
-                  : '范围：全部分类中的待完成任务'}
+                  ? `范围：${selectedCategoryName}分类中的未安排任务`
+                  : '范围：全部分类中的未安排任务'}
               </span>
             </div>
 
@@ -352,11 +384,17 @@ export default function SchedulingPreviewModal({
                 role="status"
               >
                 <strong>
-                  {confirmationResult.successCount} 个日程创建成功
+                  {confirmationResult.successCount} 个任务已成功安排
                   {confirmationResult.failures.length > 0
-                    ? `，${confirmationResult.failures.length} 个创建失败`
+                    ? `，${confirmationResult.failures.length} 个项目需要处理`
                     : ''}
                 </strong>
+                {confirmationResult.eventCreatedCount > confirmationResult.successCount && (
+                  <span>
+                    另有 {confirmationResult.eventCreatedCount - confirmationResult.successCount}
+                    个日程已创建，但任务关联未完成。
+                  </span>
+                )}
                 {confirmationResult.failures.length > 0 && (
                   <ul>
                     {confirmationResult.failures.map((failure) => (
