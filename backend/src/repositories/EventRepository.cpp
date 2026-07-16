@@ -57,6 +57,23 @@ std::vector<models::Event> EventRepository::findAll() const
     return events;
 }
 
+std::vector<models::Event> EventRepository::findByDate(const std::string& date) const
+{
+    const auto result = database::DatabaseManager::instance().client()->execSqlSync(
+        "SELECT id, title, description, date, start_time, end_time, type, "
+        "category_id, reminder_enabled, created_at, updated_at "
+        "FROM events WHERE date = ? ORDER BY start_time ASC, id ASC;",
+        date);
+
+    std::vector<models::Event> events;
+    events.reserve(result.size());
+    for (const auto& row : result)
+    {
+        events.push_back(eventFromRow(row));
+    }
+    return events;
+}
+
 std::optional<models::Event> EventRepository::findById(const std::string& id) const
 {
     const auto result = database::DatabaseManager::instance().client()->execSqlSync(
