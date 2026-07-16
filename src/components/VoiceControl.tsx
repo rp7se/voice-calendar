@@ -3,13 +3,16 @@ import { useSpeechRecognition } from '../hooks/useSpeechRecognition.ts'
 import type { ScheduleSummary } from '../utils/scheduleSummary.ts'
 import { getDaysBetweenToday } from '../utils/date.ts'
 import {
-  addDateToCategory,
-  addEvent,
+  createEvent,
   deleteEvent,
+  getEventErrorMessage,
+  getEventsByDate,
+} from '../services/eventDataSource.ts'
+import {
+  addDateToCategory,
   getCategories,
   getCountdowns,
   getDatesByCategory,
-  getEventsByDate,
 } from '../utils/storage.ts'
 import { summarizeDay, summarizeNextSevenDays } from '../utils/scheduleSummary.ts'
 import { parseVoiceCommand } from '../utils/voiceCommandParser.ts'
@@ -197,7 +200,7 @@ export default function VoiceControl({
     return wakeWordResult.commandText
   }
 
-  const handleExecuteCommand = (text: string) => {
+  const handleExecuteCommand = async (text: string) => {
     const commandText = normalizeCommandText(text)
     if (commandText === null) {
       return
@@ -271,23 +274,30 @@ export default function VoiceControl({
     }
 
     if (command.intent === 'add' && command.date && command.title && command.startTime) {
-      addEvent({
-        title: command.title,
-        description: `由语音指令创建：${command.rawText}`,
-        date: command.date,
-        startTime: command.startTime,
-        endTime: command.endTime,
-        type: command.eventType ?? 'schedule',
-        categoryId: undefined,
-        reminderEnabled: true,
-      })
+      try {
+        await createEvent({
+          title: command.title,
+          description: `由语音指令创建：${command.rawText}`,
+          date: command.date,
+          startTime: command.startTime,
+          endTime: command.endTime,
+          type: command.eventType ?? 'schedule',
+          categoryId: undefined,
+          reminderEnabled: true,
+        })
 
-      const suggestion = getAssistantSuggestion(command.title)
-      const message = `已为你添加${command.dateLabel ?? command.date}${command.timeLabel ?? command.startTime}的${command.title}提醒${
-        suggestion ? `。助手建议：${suggestion}` : '。'
-      }`
-      setAndSpeak({ title: '添加成功', message })
-      onCalendarChange?.()
+        const suggestion = getAssistantSuggestion(command.title)
+        const message = `已为你添加${command.dateLabel ?? command.date}${command.timeLabel ?? command.startTime}的${command.title}提醒${
+          suggestion ? `。助手建议：${suggestion}` : '。'
+        }`
+        setAndSpeak({ title: '添加成功', message })
+        onCalendarChange?.()
+      } catch (error) {
+        setAndSpeak({
+          title: '添加失败',
+          message: getEventErrorMessage(error, '日程保存失败，请稍后重试。'),
+        })
+      }
       return
     }
 
@@ -306,7 +316,18 @@ export default function VoiceControl({
         const timeMatched = command.startTime ? event.startTime === command.startTime : true
         return titleMatched && timeMatched
       })
-      const deleted = matchedEvent ? deleteEvent(matchedEvent.id) : false
+      let deleted = false
+      if (matchedEvent) {
+        try {
+          deleted = await deleteEvent(matchedEvent.id)
+        } catch (error) {
+          setAndSpeak({
+            title: '删除失败',
+            message: getEventErrorMessage(error, '日程删除失败，请稍后重试。'),
+          })
+          return
+        }
+      }
       const message =
         deleted && matchedEvent
           ? `已删除${command.dateLabel ?? command.date}${matchedEvent.startTime}的${matchedEvent.title}。`

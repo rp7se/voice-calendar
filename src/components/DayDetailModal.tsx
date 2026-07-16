@@ -1,14 +1,25 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import TimeBlockPlanner from './TimeBlockPlanner.tsx'
-import type { CalendarEvent, EventCategory, EventType } from '../types/calendar.ts'
-import { addEvent, deleteEvent, getCategories, getEventsByDate } from '../utils/storage.ts'
+import type {
+  CalendarEvent,
+  CalendarEventInput,
+  EventCategory,
+  EventType,
+} from '../types/calendar.ts'
+import {
+  createEvent,
+  deleteEvent,
+  getEventErrorMessage,
+  getEventsByDate,
+  updateEvent,
+} from '../services/eventDataSource.ts'
+import { getCategories } from '../utils/storage.ts'
 
 type DayDetailModalProps = {
   selectedDate: string
   isOpen: boolean
   onClose: () => void
   onEventsChange?: () => void
-  categoriesVersion?: number
 }
 
 const TYPE_OPTIONS: { value: EventType; label: string }[] = [
@@ -50,33 +61,34 @@ export default function DayDetailModal({
   isOpen,
   onClose,
   onEventsChange,
-  categoriesVersion = 0,
 }: DayDetailModalProps) {
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [categories, setCategories] = useState<EventCategory[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
+  const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [operationError, setOperationError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [, setRefreshVersion] = useState(0)
 
   const refreshEvents = () => {
-    setEvents(getEventsByDate(selectedDate))
-    setCategories(getCategories())
+    setRefreshVersion((version) => version + 1)
   }
 
-  useEffect(() => {
-    if (!isOpen) {
-      return
-    }
-    refreshEvents()
-  }, [isOpen, selectedDate, categoriesVersion])
+  const events = getEventsByDate(selectedDate)
+  const categories: EventCategory[] = getCategories()
 
   const sortedEvents = useMemo(() => sortEventsByTime(events), [events])
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const resetEditor = () => {
+    setForm(EMPTY_FORM)
+    setEditingEventId(null)
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!form.title.trim() || !form.startTime) {
       return
     }
 
-    addEvent({
+    const eventInput: CalendarEventInput = {
       title: form.title.trim(),
       description: form.description.trim(),
       date: selectedDate,
@@ -85,17 +97,60 @@ export default function DayDetailModal({
       type: form.type,
       categoryId: form.categoryId || undefined,
       reminderEnabled: form.reminderEnabled,
-    })
+    }
 
-    setForm(EMPTY_FORM)
-    refreshEvents()
-    onEventsChange?.()
+    setIsSaving(true)
+    setOperationError('')
+    try {
+      if (editingEventId) {
+        const updated = await updateEvent(editingEventId, eventInput)
+        if (!updated) {
+          setOperationError('没有找到需要修改的日程。')
+          return
+        }
+      } else {
+        await createEvent(eventInput)
+      }
+      resetEditor()
+      refreshEvents()
+      onEventsChange?.()
+    } catch (error) {
+      setOperationError(getEventErrorMessage(error, '保存日程失败，请稍后重试。'))
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  const handleDelete = (id: string) => {
-    deleteEvent(id)
-    refreshEvents()
-    onEventsChange?.()
+  const handleDelete = async (id: string) => {
+    setOperationError('')
+    try {
+      const deleted = await deleteEvent(id)
+      if (!deleted) {
+        setOperationError('没有找到需要删除的日程。')
+        return
+      }
+      if (editingEventId === id) {
+        resetEditor()
+      }
+      refreshEvents()
+      onEventsChange?.()
+    } catch (error) {
+      setOperationError(getEventErrorMessage(error, '删除日程失败，请稍后重试。'))
+    }
+  }
+
+  const handleEdit = (event: CalendarEvent) => {
+    setEditingEventId(event.id)
+    setOperationError('')
+    setForm({
+      title: event.title,
+      description: event.description,
+      startTime: event.startTime,
+      endTime: event.endTime ?? '',
+      type: event.type,
+      categoryId: event.categoryId ?? '',
+      reminderEnabled: event.reminderEnabled,
+    })
   }
 
   const handlePlannerSaved = () => {
@@ -147,9 +202,14 @@ export default function DayDetailModal({
                       </span>
                       {item.description && <p>{item.description}</p>}
                     </div>
-                    <button type="button" onClick={() => handleDelete(item.id)}>
-                      删除
-                    </button>
+                    <div className="day-detail-modal-event-actions">
+                      <button type="button" onClick={() => handleEdit(item)}>
+                        编辑
+                      </button>
+                      <button type="button" onClick={() => void handleDelete(item.id)}>
+                        删除
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -157,7 +217,14 @@ export default function DayDetailModal({
           </section>
 
           <form className="day-detail-modal-form" onSubmit={handleSubmit}>
-            <h3>添加普通事项</h3>
+            <div className="day-detail-modal-form-heading">
+              <h3>{editingEventId ? '编辑事项' : '添加普通事项'}</h3>
+              {editingEventId && (
+                <button type="button" onClick={resetEditor}>
+                  取消编辑
+                </button>
+              )}
+            </div>
             <div className="day-detail-modal-form-grid">
               <div className="form-row">
                 <label htmlFor="modal-event-title">标题 *</label>
@@ -260,8 +327,17 @@ export default function DayDetailModal({
                 开启提醒
               </label>
             </div>
-            <button type="submit" className="form-submit-btn day-detail-modal-submit">
-              添加事项
+            {operationError && (
+              <p className="event-operation-error" role="alert">
+                {operationError}
+              </p>
+            )}
+            <button
+              type="submit"
+              className="form-submit-btn day-detail-modal-submit"
+              disabled={isSaving}
+            >
+              {isSaving ? '正在保存...' : editingEventId ? '保存修改' : '添加事项'}
             </button>
           </form>
 

@@ -1,11 +1,16 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import type { CalendarEvent, EventCategory, EventType } from '../types/calendar.ts'
-import { addEvent, deleteEvent, getCategories, getEventsByDate } from '../utils/storage.ts'
+import {
+  createEvent,
+  deleteEvent,
+  getEventErrorMessage,
+  getEventsByDate,
+} from '../services/eventDataSource.ts'
+import { getCategories } from '../utils/storage.ts'
 
 type DayDetailProps = {
   selectedDate: string
   onEventsChange?: () => void
-  categoriesVersion?: number
   compact?: boolean
 }
 
@@ -67,21 +72,18 @@ function formatDuration(minutes: number): string {
 export default function DayDetail({
   selectedDate,
   onEventsChange,
-  categoriesVersion = 0,
   compact = false,
 }: DayDetailProps) {
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [categories, setCategories] = useState<EventCategory[]>([])
   const [form, setForm] = useState(EMPTY_FORM)
+  const [operationError, setOperationError] = useState('')
+  const [, setRefreshVersion] = useState(0)
 
   const refreshEvents = () => {
-    setEvents(getEventsByDate(selectedDate))
-    setCategories(getCategories())
+    setRefreshVersion((version) => version + 1)
   }
 
-  useEffect(() => {
-    refreshEvents()
-  }, [selectedDate, categoriesVersion])
+  const events = getEventsByDate(selectedDate)
+  const categories: EventCategory[] = getCategories()
 
   const groupedEvents = useMemo(() => {
     return TYPE_GROUPS.map((group) => ({
@@ -95,32 +97,43 @@ export default function DayDetail({
     [events],
   )
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!form.title.trim() || !form.startTime) {
       return
     }
 
-    addEvent({
-      title: form.title.trim(),
-      description: form.description.trim(),
-      date: selectedDate,
-      startTime: form.startTime,
-      endTime: form.endTime || undefined,
-      type: form.type,
-      categoryId: form.categoryId || undefined,
-      reminderEnabled: form.reminderEnabled,
-    })
-
-    setForm(EMPTY_FORM)
-    refreshEvents()
-    onEventsChange?.()
+    setOperationError('')
+    try {
+      await createEvent({
+        title: form.title.trim(),
+        description: form.description.trim(),
+        date: selectedDate,
+        startTime: form.startTime,
+        endTime: form.endTime || undefined,
+        type: form.type,
+        categoryId: form.categoryId || undefined,
+        reminderEnabled: form.reminderEnabled,
+      })
+      setForm(EMPTY_FORM)
+      refreshEvents()
+      onEventsChange?.()
+    } catch (error) {
+      setOperationError(getEventErrorMessage(error, '保存日程失败，请稍后重试。'))
+    }
   }
 
-  const handleDelete = (id: string) => {
-    deleteEvent(id)
-    refreshEvents()
-    onEventsChange?.()
+  const handleDelete = async (id: string) => {
+    setOperationError('')
+    try {
+      const deleted = await deleteEvent(id)
+      if (deleted) {
+        refreshEvents()
+        onEventsChange?.()
+      }
+    } catch (error) {
+      setOperationError(getEventErrorMessage(error, '删除日程失败，请稍后重试。'))
+    }
   }
 
   const hasEvents = events.length > 0
@@ -237,6 +250,11 @@ export default function DayDetail({
           />
           开启提醒
         </label>
+        {operationError && (
+          <p className="event-operation-error" role="alert">
+            {operationError}
+          </p>
+        )}
         <button type="submit" className="form-submit-btn">
           添加
         </button>
@@ -268,7 +286,7 @@ export default function DayDetail({
                     <button
                       type="button"
                       className="event-delete-btn"
-                      onClick={() => handleDelete(item.id)}
+                      onClick={() => void handleDelete(item.id)}
                     >
                       删除
                     </button>

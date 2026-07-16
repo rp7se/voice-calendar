@@ -161,6 +161,16 @@ npm install
 npm run dev
 ```
 
+默认使用现有 localStorage 日程数据。需要联调 C++ Backend 时，先启动 Backend，
+再复制 `.env.example` 为不提交 Git 的 `.env.local`，并设置：
+
+```text
+VITE_API_BASE_URL=/api
+VITE_EVENT_DATA_SOURCE=backend
+```
+
+开发服务器会把浏览器的 `/api` 请求代理到 `http://127.0.0.1:8080`。
+
 启动后在浏览器中打开：
 
 ```text
@@ -179,14 +189,15 @@ npm run build
 
 ## 数据存储说明
 
-项目使用浏览器 localStorage 保存数据，包括：
+默认 local 模式使用浏览器 localStorage 保存数据，包括：
 
 * 日程事项
 * 倒计时事项
 * 分类文件夹
 * 分类与日期的关联关系
 
-所有数据保存在本地浏览器中，不会上传到服务器。
+backend 模式下只有 Event 通过 C++ API 保存到 SQLite；分类、倒计时和任务仍保持现有本地存储。
+两种 Event 数据源不会自动迁移或双写。
 
 ## 开发过程说明
 

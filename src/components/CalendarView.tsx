@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react'
-import { getEvents } from '../utils/storage.ts'
+import { getEvents } from '../services/eventDataSource.ts'
 import {
   formatDate,
   formatYearMonth,
@@ -13,7 +13,6 @@ const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 type CalendarViewProps = {
   selectedDate: string
   onSelectDate: (date: Date) => void
-  eventsVersion?: number
 }
 
 function buildEventCountMap(): Record<string, number> {
@@ -27,7 +26,6 @@ function buildEventCountMap(): Record<string, number> {
 export default function CalendarView({
   selectedDate,
   onSelectDate,
-  eventsVersion = 0,
 }: CalendarViewProps) {
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
@@ -39,10 +37,7 @@ export default function CalendarView({
     [viewYear, viewMonth],
   )
 
-  const eventCounts = useMemo(
-    () => buildEventCountMap(),
-    [viewYear, viewMonth, eventsVersion],
-  )
+  const eventCounts = buildEventCountMap()
 
   const goToPrevMonth = () => {
     if (viewMonth === 0) {

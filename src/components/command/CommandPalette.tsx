@@ -7,7 +7,8 @@ import {
 } from 'react'
 import type { WorkspaceId } from '../layout/Sidebar.tsx'
 import type { VoiceRuntimeStatus } from '../VoiceControl.tsx'
-import { getEvents, getCategories } from '../../utils/storage.ts'
+import { getEvents } from '../../services/eventDataSource.ts'
+import { getCategories } from '../../utils/storage.ts'
 import { getTasks } from '../../utils/taskStorage.ts'
 
 type CommandPaletteProps = {

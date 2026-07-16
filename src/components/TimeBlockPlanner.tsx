@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { EventType } from '../types/calendar.ts'
-import { addEvent } from '../utils/storage.ts'
+import { createEvent, getEventErrorMessage } from '../services/eventDataSource.ts'
 
 type TimeBlockPlannerProps = {
   selectedDate: string
@@ -37,6 +37,8 @@ export default function TimeBlockPlanner({
 }: TimeBlockPlannerProps) {
   const [mode, setMode] = useState<PlannerMode | null>(null)
   const [blocks, setBlocks] = useState<Record<string, string>>(() => createEmptyBlocks())
+  const [saveError, setSaveError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   const startPlanner = (nextMode: PlannerMode) => {
     setMode(nextMode)
@@ -50,36 +52,44 @@ export default function TimeBlockPlanner({
     }))
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!mode) {
       return
     }
 
+    setIsSaving(true)
+    setSaveError('')
     let savedCount = 0
-    for (const block of TIME_BLOCKS) {
-      const key = `${block.startTime}-${block.endTime}`
-      const title = blocks[key]?.trim()
-      if (!title) {
-        continue
+    try {
+      for (const block of TIME_BLOCKS) {
+        const key = `${block.startTime}-${block.endTime}`
+        const title = blocks[key]?.trim()
+        if (!title) {
+          continue
+        }
+
+        await createEvent({
+          title,
+          description: `${getModeLabel(mode)}时间格子创建`,
+          date: selectedDate,
+          startTime: block.startTime,
+          endTime: block.endTime,
+          type: mode as EventType,
+          reminderEnabled: false,
+        })
+        savedCount += 1
       }
 
-      addEvent({
-        title,
-        description: `${getModeLabel(mode)}时间格子创建`,
-        date: selectedDate,
-        startTime: block.startTime,
-        endTime: block.endTime,
-        type: mode as EventType,
-        reminderEnabled: false,
-      })
-      savedCount += 1
+      setMode(null)
+      setBlocks(createEmptyBlocks())
+    } catch (error) {
+      setSaveError(getEventErrorMessage(error, '保存时间表失败，请稍后重试。'))
+    } finally {
+      if (savedCount > 0) {
+        onSaved?.()
+      }
+      setIsSaving(false)
     }
-
-    if (savedCount > 0) {
-      onSaved?.()
-    }
-    setMode(null)
-    setBlocks(createEmptyBlocks())
   }
 
   return (
@@ -124,11 +134,21 @@ export default function TimeBlockPlanner({
             })}
           </div>
           <div className="time-block-footer">
+            {saveError && (
+              <p className="event-operation-error" role="alert">
+                {saveError}
+              </p>
+            )}
             <button type="button" className="time-block-cancel" onClick={() => setMode(null)}>
               取消
             </button>
-            <button type="button" className="time-block-save" onClick={handleSave}>
-              保存时间表
+            <button
+              type="button"
+              className="time-block-save"
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+            >
+              {isSaving ? '正在保存...' : '保存时间表'}
             </button>
           </div>
         </div>
