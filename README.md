@@ -3,8 +3,6 @@
 VoiceCalendar 是一个支持语音交互、确定性任务排程和实时提醒的现代日程管理系统：前端使用 React + TypeScript + Vite，后端使用 C++17 + Drogon，Event、Task、Category 与 Reminder Delivery 持久化到 SQLite。
 
 
-> 该视频是项目既有演示入口；当前仓库的 VoiceCalendar 2.0 在其基础上继续加入了 C++ Backend、Tasks、自动排程和实时 Reminder 等能力。
-
 ## Features
 
 - **Today Workspace**：聚合今日事件、任务、时间线和下一项安排。
