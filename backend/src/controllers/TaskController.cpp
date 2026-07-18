@@ -1,5 +1,6 @@
 #include "controllers/TaskController.h"
 
+#include "http/HttpResponseUtils.h"
 #include "http/TaskJson.h"
 
 #include <drogon/utils/Utilities.h>
@@ -14,36 +15,8 @@ namespace voicecalendar::api
 {
 namespace
 {
-using ResponseCallback = std::function<void(const drogon::HttpResponsePtr&)>;
-
-drogon::HttpResponsePtr jsonResponse(Json::Value body, drogon::HttpStatusCode status)
-{
-    auto response = drogon::HttpResponse::newHttpJsonResponse(std::move(body));
-    response->setStatusCode(status);
-    return response;
-}
-
-void sendError(
-    ResponseCallback& callback,
-    drogon::HttpStatusCode status,
-    const std::string& error,
-    const std::string& message)
-{
-    Json::Value body(Json::objectValue);
-    body["error"] = error;
-    body["message"] = message;
-    callback(jsonResponse(std::move(body), status));
-}
-
-void sendInternalError(ResponseCallback& callback, const std::exception& error)
-{
-    LOG_ERROR << "Task API database operation failed: " << error.what();
-    sendError(
-        callback,
-        drogon::k500InternalServerError,
-        "internal_error",
-        "An internal server error occurred");
-}
+using http::ResponseCallback;
+using http::sendError;
 
 std::string utcNowIso8601()
 {
@@ -78,11 +51,11 @@ void TaskController::listTasks(
         {
             body.append(http::taskToJson(task));
         }
-        callback(jsonResponse(std::move(body), drogon::k200OK));
+        callback(http::jsonResponse(std::move(body), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Task API list failed", error);
     }
 }
 
@@ -99,11 +72,11 @@ void TaskController::getTask(
             sendError(callback, drogon::k404NotFound, "task_not_found", "Task not found");
             return;
         }
-        callback(jsonResponse(http::taskToJson(*task), drogon::k200OK));
+        callback(http::jsonResponse(http::taskToJson(*task), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Task API get failed", error);
     }
 }
 
@@ -144,11 +117,11 @@ void TaskController::createTask(
         parsed.task.createdAt = utcNowIso8601();
         parsed.task.updatedAt = parsed.task.createdAt;
         const auto task = repository_.create(parsed.task);
-        callback(jsonResponse(http::taskToJson(task), drogon::k201Created));
+        callback(http::jsonResponse(http::taskToJson(task), drogon::k201Created));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Task API create failed", error);
     }
 }
 
@@ -195,11 +168,11 @@ void TaskController::updateTask(
             sendError(callback, drogon::k404NotFound, "task_not_found", "Task not found");
             return;
         }
-        callback(jsonResponse(http::taskToJson(parsed.task), drogon::k200OK));
+        callback(http::jsonResponse(http::taskToJson(parsed.task), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Task API update failed", error);
     }
 }
 
@@ -281,11 +254,11 @@ void TaskController::linkTaskScheduling(
         {
             throw std::runtime_error("Task scheduling link succeeded but the task could not be reloaded");
         }
-        callback(jsonResponse(http::taskToJson(*updated), drogon::k200OK));
+        callback(http::jsonResponse(http::taskToJson(*updated), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Task scheduling link failed", error);
     }
 }
 
@@ -308,7 +281,7 @@ void TaskController::deleteTask(
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Task API delete failed", error);
     }
 }
 

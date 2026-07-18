@@ -1,26 +1,21 @@
 #include "controllers/FreeTimeController.h"
 
+#include "http/HttpResponseUtils.h"
 #include "utils/DateTimeUtils.h"
 
 namespace voicecalendar::api
 {
 namespace
 {
-using ResponseCallback = std::function<void(const drogon::HttpResponsePtr&)>;
-
-drogon::HttpResponsePtr jsonResponse(Json::Value body, drogon::HttpStatusCode status)
-{
-    auto response = drogon::HttpResponse::newHttpJsonResponse(std::move(body));
-    response->setStatusCode(status);
-    return response;
-}
+using http::ResponseCallback;
 
 void sendInvalidQuery(ResponseCallback& callback, const std::string& message)
 {
-    Json::Value body(Json::objectValue);
-    body["error"] = "invalid_query";
-    body["message"] = message;
-    callback(jsonResponse(std::move(body), drogon::k400BadRequest));
+    http::sendError(
+        callback,
+        drogon::k400BadRequest,
+        "invalid_query",
+        message);
 }
 } // namespace
 
@@ -74,15 +69,11 @@ void FreeTimeController::getFreeTime(
             freeSlot["durationMinutes"] = slot.endMinutes - slot.startMinutes;
             body["freeSlots"].append(std::move(freeSlot));
         }
-        callback(jsonResponse(std::move(body), drogon::k200OK));
+        callback(http::jsonResponse(std::move(body), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        LOG_ERROR << "Free time query failed: " << error.what();
-        Json::Value body(Json::objectValue);
-        body["error"] = "internal_error";
-        body["message"] = "An internal server error occurred";
-        callback(jsonResponse(std::move(body), drogon::k500InternalServerError));
+        http::sendInternalError(callback, "Free time query failed", error);
     }
 }
 

@@ -1,6 +1,7 @@
 #include "controllers/EventController.h"
 
 #include "http/EventJson.h"
+#include "http/HttpResponseUtils.h"
 
 #include <drogon/utils/Utilities.h>
 
@@ -13,45 +14,15 @@ namespace voicecalendar::api
 {
 namespace
 {
-using ResponseCallback = std::function<void(const drogon::HttpResponsePtr&)>;
-
-drogon::HttpResponsePtr jsonResponse(Json::Value body, drogon::HttpStatusCode status)
-{
-    auto response = drogon::HttpResponse::newHttpJsonResponse(std::move(body));
-    response->setStatusCode(status);
-    return response;
-}
-
-void sendError(
-    ResponseCallback& callback,
-    drogon::HttpStatusCode status,
-    const std::string& error,
-    const std::string& message)
-{
-    Json::Value body(Json::objectValue);
-    body["error"] = error;
-    body["message"] = message;
-    callback(jsonResponse(std::move(body), status));
-}
-
-void sendInternalError(ResponseCallback& callback, const std::exception& error)
-{
-    LOG_ERROR << "Event API database operation failed: " << error.what();
-    sendError(
-        callback,
-        drogon::k500InternalServerError,
-        "internal_error",
-        "An internal server error occurred");
-}
+using http::ResponseCallback;
+using http::sendError;
 
 void sendConflict(
     ResponseCallback& callback,
     const std::vector<models::Event>& conflicts)
 {
-    Json::Value body(Json::objectValue);
-    body["error"] = "event_conflict";
-    body["message"] = "The event conflicts with an existing event";
-    body["conflicts"] = Json::Value(Json::arrayValue);
+    Json::Value extra(Json::objectValue);
+    extra["conflicts"] = Json::Value(Json::arrayValue);
     for (const auto& event : conflicts)
     {
         Json::Value conflict(Json::objectValue);
@@ -60,9 +31,14 @@ void sendConflict(
         conflict["date"] = event.date;
         conflict["startTime"] = event.startTime;
         conflict["endTime"] = *event.endTime;
-        body["conflicts"].append(std::move(conflict));
+        extra["conflicts"].append(std::move(conflict));
     }
-    callback(jsonResponse(std::move(body), drogon::k409Conflict));
+    sendError(
+        callback,
+        drogon::k409Conflict,
+        "event_conflict",
+        "The event conflicts with an existing event",
+        std::move(extra));
 }
 
 std::string utcNowIso8601()
@@ -99,11 +75,11 @@ void EventController::listEvents(
         {
             body.append(http::eventToJson(event));
         }
-        callback(jsonResponse(std::move(body), drogon::k200OK));
+        callback(http::jsonResponse(std::move(body), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Event API list failed", error);
     }
 }
 
@@ -120,11 +96,11 @@ void EventController::getEvent(
             sendError(callback, drogon::k404NotFound, "event_not_found", "Event not found");
             return;
         }
-        callback(jsonResponse(http::eventToJson(*event), drogon::k200OK));
+        callback(http::jsonResponse(http::eventToJson(*event), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Event API get failed", error);
     }
 }
 
@@ -175,11 +151,11 @@ void EventController::createEvent(
         parsed.event.createdAt = utcNowIso8601();
         parsed.event.updatedAt = parsed.event.createdAt;
         const auto event = repository_.create(parsed.event);
-        callback(jsonResponse(http::eventToJson(event), drogon::k201Created));
+        callback(http::jsonResponse(http::eventToJson(event), drogon::k201Created));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Event API create failed", error);
     }
 }
 
@@ -246,11 +222,11 @@ void EventController::updateEvent(
             sendError(callback, drogon::k404NotFound, "event_not_found", "Event not found");
             return;
         }
-        callback(jsonResponse(http::eventToJson(parsed.event), drogon::k200OK));
+        callback(http::jsonResponse(http::eventToJson(parsed.event), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Event API update failed", error);
     }
 }
 
@@ -273,7 +249,7 @@ void EventController::deleteEvent(
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Event API delete failed", error);
     }
 }
 

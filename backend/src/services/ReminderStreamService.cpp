@@ -2,6 +2,7 @@
 
 #include "http/ReminderJson.h"
 
+#include <drogon/drogon.h>
 #include <json/writer.h>
 
 #include <sstream>
@@ -32,6 +33,7 @@ void ReminderStreamService::start(
         [this]() {
             sendHeartbeat();
         });
+    LOG_INFO << "Reminder SSE stream service started";
 }
 
 void ReminderStreamService::stop()
@@ -58,6 +60,7 @@ void ReminderStreamService::stop()
     {
         stream->close();
     }
+    LOG_INFO << "Reminder SSE stream service stopped";
 }
 
 void ReminderStreamService::addClient(drogon::ResponseStreamPtr stream)
@@ -71,6 +74,7 @@ void ReminderStreamService::addClient(drogon::ResponseStreamPtr stream)
 
     std::lock_guard<std::mutex> lock(mutex_);
     clients_.emplace(nextClientId_++, std::move(sharedStream));
+    LOG_DEBUG << "Reminder SSE client connected";
 }
 
 void ReminderStreamService::broadcast(const models::ReminderDelivery& delivery)
@@ -98,6 +102,7 @@ void ReminderStreamService::sendToClients(const std::string& message)
         {
             client->second->close();
             client = clients_.erase(client);
+            LOG_DEBUG << "Reminder SSE client disconnected";
             continue;
         }
         ++client;

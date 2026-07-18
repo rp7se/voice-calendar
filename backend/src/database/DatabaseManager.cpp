@@ -2,9 +2,7 @@
 
 #include <drogon/orm/Exception.h>
 
-#include <cstdlib>
 #include <fstream>
-#include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -14,8 +12,6 @@ namespace voicecalendar::database
 {
 namespace
 {
-constexpr auto kDatabasePathEnv = "VOICECALENDAR_DB_PATH";
-constexpr auto kDefaultDatabaseFile = "voicecalendar.db";
 constexpr auto kCreateEventsMigration = "001_create_events.sql";
 constexpr auto kCreateTasksMigration = "002_create_tasks.sql";
 constexpr auto kCreateCategoriesMigration = "003_create_categories.sql";
@@ -25,12 +21,6 @@ constexpr auto kEventRemindersMigration = "005_add_event_reminders.sql";
 std::filesystem::path normalizePath(std::filesystem::path path)
 {
     return path.lexically_normal();
-}
-
-bool hasBackendCMakeLists(const std::filesystem::path& path)
-{
-    return std::filesystem::exists(path / "CMakeLists.txt") &&
-           path.filename() == "backend";
 }
 
 std::string trimSqlStatement(const std::string& statement)
@@ -76,40 +66,35 @@ std::vector<std::string> splitMigrationStatements(const std::string& sql)
 }
 } // namespace
 
-DatabaseManager DatabaseManager::create()
-{
-    if (const char* envPath = std::getenv(kDatabasePathEnv);
-        envPath != nullptr && std::string(envPath).empty() == false)
-    {
-        return DatabaseManager{normalizePath(envPath)};
-    }
-
-    return DatabaseManager{resolveDefaultDatabasePath()};
-}
-
 DatabaseManager& DatabaseManager::instance()
 {
-    static auto manager = create();
+    static DatabaseManager manager;
     return manager;
 }
 
-DatabaseManager::DatabaseManager(std::filesystem::path databasePath)
-    : databasePath_(normalizePath(std::move(databasePath)))
+void DatabaseManager::initialize(
+    std::filesystem::path databasePath,
+    std::filesystem::path backendRoot)
 {
-}
+    databasePath_ = normalizePath(std::move(databasePath));
+    backendRoot_ = normalizePath(std::move(backendRoot));
+    if (databasePath_.empty() || backendRoot_.empty())
+    {
+        throw std::invalid_argument("Database path and backend root must not be empty");
+    }
 
-void DatabaseManager::initialize()
-{
     try
     {
-        std::filesystem::create_directories(databasePath_.parent_path());
+        const auto parentPath = databasePath_.parent_path();
+        if (!parentPath.empty())
+        {
+            std::filesystem::create_directories(parentPath);
+        }
 
         client_ = createClient();
         client_->execSqlSync("PRAGMA foreign_keys = ON;");
         runMigrations(client_);
         verifySchema(client_);
-
-        std::cout << "Database ready: " << databasePath_.string() << '\n';
     }
     catch (const drogon::orm::DrogonDbException& error)
     {
@@ -136,42 +121,9 @@ drogon::orm::DbClientPtr DatabaseManager::client() const
     return client_;
 }
 
-std::filesystem::path DatabaseManager::resolveDefaultDatabasePath()
+std::vector<std::filesystem::path> DatabaseManager::resolveMigrationPaths() const
 {
-    return resolveBackendRoot() / "data" / kDefaultDatabaseFile;
-}
-
-std::filesystem::path DatabaseManager::resolveBackendRoot()
-{
-    auto current = std::filesystem::current_path();
-
-    while (true)
-    {
-        if (hasBackendCMakeLists(current))
-        {
-            return current;
-        }
-
-        const auto backendCandidate = current / "backend";
-        if (hasBackendCMakeLists(backendCandidate))
-        {
-            return backendCandidate;
-        }
-
-        if (current == current.root_path())
-        {
-            break;
-        }
-
-        current = current.parent_path();
-    }
-
-    return std::filesystem::current_path() / "backend";
-}
-
-std::vector<std::filesystem::path> DatabaseManager::resolveMigrationPaths()
-{
-    const auto migrationsRoot = resolveBackendRoot() / "migrations";
+    const auto migrationsRoot = backendRoot_ / "migrations";
     return {
         migrationsRoot / kCreateEventsMigration,
         migrationsRoot / kCreateTasksMigration,

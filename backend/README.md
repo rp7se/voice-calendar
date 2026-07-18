@@ -36,21 +36,37 @@ cmake -S backend -B backend/build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOL
 
 依赖由 `backend/vcpkg.json` 声明，CMake configure 阶段会通过 vcpkg manifest mode 安装项目依赖。
 
-## 数据库
+## Backend 配置
 
-默认数据库路径：
+Backend 在启动时读取以下环境变量；未设置时使用安全默认值：
 
-```text
-backend/data/voicecalendar.db
-```
+| 环境变量 | 默认值 | 验证规则 |
+| --- | --- | --- |
+| `VOICECALENDAR_HOST` | `127.0.0.1` | 不得为空 |
+| `VOICECALENDAR_PORT` | `8080` | `1`～`65535` 的整数 |
+| `VOICECALENDAR_DB_PATH` | `backend/data/voicecalendar.db` | 不得为空 |
+| `VOICECALENDAR_REMINDER_SCAN_SECONDS` | `30` | 大于等于 `1` 的整数秒数 |
 
-可通过环境变量覆盖：
+环境变量优先于默认值。Port 或 Reminder 扫描间隔等配置非法时，Backend 会记录明确错误并拒绝启动，不会静默回退或截断。`VOICECALENDAR_DB_PATH` 使用绝对路径时保持原值；使用相对路径时始终相对于仓库根目录解析，不依赖启动时的 Working Directory。
+
+PowerShell 示例：
 
 ```powershell
+$env:VOICECALENDAR_PORT = "8081"
 $env:VOICECALENDAR_DB_PATH = "backend/data/dev.db"
+$env:VOICECALENDAR_REMINDER_SCAN_SECONDS = "10"
+.\backend\build\Debug\voicecalendar_backend.exe
 ```
 
-数据库文件、WAL 和 SHM 文件不会提交到 Git；`backend/data/.gitkeep` 仅用于保留目录。
+测试结束后可移除覆盖：
+
+```powershell
+Remove-Item Env:VOICECALENDAR_PORT -ErrorAction SilentlyContinue
+Remove-Item Env:VOICECALENDAR_DB_PATH -ErrorAction SilentlyContinue
+Remove-Item Env:VOICECALENDAR_REMINDER_SCAN_SECONDS -ErrorAction SilentlyContinue
+```
+
+默认数据库路径继续通过项目的 `backend` 源码目录解析；从仓库根目录、`backend` 目录或其他 Working Directory 启动都会打开同一个 `backend/data/voicecalendar.db`。若无法可靠定位源码目录，Backend 会拒绝启动，不会猜测路径并创建第二个默认数据库。数据库文件、WAL 和 SHM 文件不会提交到 Git；`backend/data/.gitkeep` 仅用于保留目录。
 
 ## 编译
 

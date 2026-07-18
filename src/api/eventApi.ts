@@ -41,17 +41,32 @@ export type EventWriteRequest = {
 type ApiErrorBody = {
   error?: unknown
   message?: unknown
+  conflicts?: unknown
 }
+
+export type EventConflict = Pick<
+  BackendEventDto,
+  'id' | 'title' | 'date' | 'startTime'
+> & { endTime: string }
 
 export class ApiError extends Error {
   readonly status: number
+  readonly error?: string
   readonly code?: string
+  readonly conflicts?: EventConflict[]
 
-  constructor(status: number, message: string, code?: string) {
+  constructor(
+    status: number,
+    message: string,
+    code?: string,
+    conflicts?: EventConflict[],
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.error = code
     this.code = code
+    this.conflicts = conflicts
   }
 }
 
@@ -61,6 +76,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isEventType(value: unknown): value is EventType {
   return typeof value === 'string' && EVENT_TYPES.includes(value as EventType)
+}
+
+function parseEventConflicts(value: unknown): EventConflict[] | undefined {
+  if (!Array.isArray(value)) return undefined
+
+  const conflicts = value.filter((item): item is Record<string, unknown> => (
+    isRecord(item) &&
+    typeof item.id === 'string' &&
+    typeof item.title === 'string' &&
+    typeof item.date === 'string' &&
+    typeof item.startTime === 'string' &&
+    typeof item.endTime === 'string'
+  )).map((item) => ({
+    id: item.id as string,
+    title: item.title as string,
+    date: item.date as string,
+    startTime: item.startTime as string,
+    endTime: item.endTime as string,
+  }))
+
+  return conflicts.length > 0 ? conflicts : undefined
 }
 
 function parseBackendEvent(value: unknown): BackendEventDto {
@@ -161,7 +197,8 @@ async function readError(response: Response): Promise<ApiError> {
       ? body.message
       : `日程请求失败（HTTP ${response.status}）。`
   const code = typeof body?.error === 'string' ? body.error : undefined
-  return new ApiError(response.status, message, code)
+  const conflicts = parseEventConflicts(body?.conflicts)
+  return new ApiError(response.status, message, code, conflicts)
 }
 
 async function requestJson(path: string, init?: RequestInit): Promise<unknown> {

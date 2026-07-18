@@ -12,8 +12,7 @@ namespace voicecalendar::services
 class ReminderService
 {
 public:
-    explicit ReminderService(
-        std::chrono::seconds scanInterval = std::chrono::seconds(30));
+    explicit ReminderService(std::chrono::seconds scanInterval);
     ~ReminderService();
 
     ReminderService(const ReminderService&) = delete;
