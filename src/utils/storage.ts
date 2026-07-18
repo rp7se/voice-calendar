@@ -4,6 +4,7 @@ import type {
   CountdownItem,
   CountdownItemInput,
   CategoryDateLink,
+  ReminderMinutesBefore,
 } from '../types/calendar.ts'
 
 export const LEGACY_EVENT_STORAGE_KEY = 'voice-calendar:events'
@@ -48,8 +49,26 @@ function writeToStorage<T>(key: string, value: T): void {
 
 // --- 日程 ---
 
+type StoredCalendarEvent = Omit<CalendarEvent, 'reminderMinutesBefore'> & {
+  reminderMinutesBefore?: ReminderMinutesBefore
+}
+
 export function getEvents(): CalendarEvent[] {
-  return readFromStorage<CalendarEvent[]>(STORAGE_KEYS.EVENTS, [])
+  return readFromStorage<StoredCalendarEvent[]>(STORAGE_KEYS.EVENTS, []).map(
+    (event) => {
+      const reminderMinutesBefore =
+        event.reminderMinutesBefore === undefined
+          ? event.reminderEnabled
+            ? 0
+            : null
+          : event.reminderMinutesBefore
+      return {
+        ...event,
+        reminderEnabled: reminderMinutesBefore !== null,
+        reminderMinutesBefore,
+      }
+    },
+  )
 }
 
 export function saveEvents(events: CalendarEvent[]): void {
@@ -60,6 +79,7 @@ export function addEvent(eventInput: CalendarEventInput): CalendarEvent {
   const timestamp = nowIso()
   const event: CalendarEvent = {
     ...eventInput,
+    reminderEnabled: eventInput.reminderMinutesBefore !== null,
     id: createId(),
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -83,6 +103,10 @@ export function updateEvent(
   const updated: CalendarEvent = {
     ...events[index],
     ...partialEvent,
+    reminderEnabled:
+      partialEvent.reminderMinutesBefore !== undefined
+        ? partialEvent.reminderMinutesBefore !== null
+        : events[index].reminderEnabled,
     id: events[index].id,
     createdAt: events[index].createdAt,
     updatedAt: nowIso(),

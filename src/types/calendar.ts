@@ -1,4 +1,5 @@
 export type EventType = 'schedule' | 'course' | 'work' | 'reminder'
+export type ReminderMinutesBefore = number | null
 
 export type CalendarEvent = {
   id: string
@@ -10,7 +11,7 @@ export type CalendarEvent = {
   type: EventType
   categoryId?: string
   reminderEnabled: boolean
-  reminderMinutesBefore?: number | null
+  reminderMinutesBefore: ReminderMinutesBefore
   createdAt: string
   updatedAt: string
 }
@@ -46,6 +47,9 @@ export type HolidayInfo = {
   type: HolidayType
 }
 
-export type CalendarEventInput = Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>
+export type CalendarEventInput = Omit<
+  CalendarEvent,
+  'id' | 'reminderEnabled' | 'createdAt' | 'updatedAt'
+>
 export type CountdownItemInput = Omit<CountdownItem, 'id' | 'createdAt'>
 export type EventCategoryInput = Omit<EventCategory, 'id' | 'createdAt' | 'updatedAt'>

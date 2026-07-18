@@ -37,6 +37,7 @@ target_sources(voicecalendar_backend
     src/services/FreeTimeService.cpp
     src/services/TaskSchedulerService.cpp
     src/services/ReminderService.cpp
+    src/services/ReminderStreamService.cpp
     src/utils/DateTimeUtils.cpp
     src/utils/ReminderDateTime.cpp
 )

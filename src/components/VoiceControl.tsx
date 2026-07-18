@@ -24,6 +24,7 @@ type VoiceControlProps = {
   listenSignal?: number
   textCommand?: VoiceExternalCommand | null
   onRuntimeChange?: (status: VoiceRuntimeStatus) => void
+  speechRequest?: VoiceSpeechRequest | null
 }
 
 type ExecutionFeedback = {
@@ -46,6 +47,11 @@ export type VoiceRuntimeStatus = {
 
 export type VoiceExternalCommand = {
   id: number
+  text: string
+}
+
+export type VoiceSpeechRequest = {
+  id: string
   text: string
 }
 
@@ -152,6 +158,7 @@ export default function VoiceControl({
   listenSignal = 0,
   textCommand = null,
   onRuntimeChange,
+  speechRequest = null,
 }: VoiceControlProps) {
   const {
     transcript,
@@ -167,6 +174,7 @@ export default function VoiceControl({
   const lastExecutedRef = useRef('')
   const lastListenSignalRef = useRef(listenSignal)
   const lastTextCommandIdRef = useRef(textCommand?.id ?? 0)
+  const lastSpeechRequestIdRef = useRef('')
   const executeCommandRef = useRef<(text: string) => void>(() => undefined)
   const toggleListeningRef = useRef<() => void>(() => undefined)
 
@@ -284,7 +292,7 @@ export default function VoiceControl({
           endTime: command.endTime,
           type: command.eventType ?? 'schedule',
           categoryId: undefined,
-          reminderEnabled: true,
+          reminderMinutesBefore: null,
         })
 
         const suggestion = getAssistantSuggestion(command.title)
@@ -405,6 +413,25 @@ export default function VoiceControl({
   useEffect(() => {
     onRuntimeChange?.(runtimeStatus)
   }, [onRuntimeChange, runtimeStatus])
+
+  useEffect(() => {
+    if (
+      !speechRequest ||
+      speechRequest.id === lastSpeechRequestIdRef.current ||
+      isListening ||
+      runtimePhase !== 'idle'
+    ) {
+      return
+    }
+
+    lastSpeechRequestIdRef.current = speechRequest.id
+    setRuntimePhase('processing')
+    speak(
+      speechRequest.text,
+      () => setRuntimePhase('speaking'),
+      () => setRuntimePhase('idle'),
+    )
+  }, [isListening, runtimePhase, speechRequest])
 
   useEffect(() => {
     if (listenSignal === lastListenSignalRef.current) {

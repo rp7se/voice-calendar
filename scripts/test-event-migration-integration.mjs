@@ -84,7 +84,7 @@ try {
     date: '2026-07-17',
     startTime: '11:00',
     type: 'schedule',
-    reminderEnabled: false,
+    reminderMinutesBefore: null,
   })
   const updated = await eventApi.updateEvent(created.id, {
     title: 'PR29 CRUD regression updated',
@@ -92,7 +92,7 @@ try {
     date: '2026-07-17',
     startTime: '11:30',
     type: 'schedule',
-    reminderEnabled: false,
+    reminderMinutesBefore: null,
   })
   assert.equal(updated.title, 'PR29 CRUD regression updated')
   await eventApi.deleteEvent(created.id)

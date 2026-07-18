@@ -17,4 +17,17 @@ Json::Value reminderDeliveryToJson(const models::ReminderDelivery& delivery)
     return json;
 }
 
+Json::Value reminderDeliveryToStreamJson(const models::ReminderDelivery& delivery)
+{
+    Json::Value json(Json::objectValue);
+    json["reminderId"] = delivery.id;
+    json["eventId"] = delivery.eventId;
+    json["title"] = delivery.title;
+    json["date"] = delivery.date;
+    json["startTime"] = delivery.startTime;
+    json["scheduledFor"] = delivery.scheduledFor;
+    json["triggeredAt"] = delivery.triggeredAt;
+    return json;
+}
+
 } // namespace voicecalendar::http

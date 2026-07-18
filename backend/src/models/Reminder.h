@@ -16,6 +16,7 @@ enum class ReminderStatus
 struct ReminderCandidate
 {
     std::string eventId;
+    std::string title;
     std::string date;
     std::string startTime;
     int reminderMinutesBefore{0};

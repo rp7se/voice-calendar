@@ -206,7 +206,7 @@ export default function SchedulingPreviewModal({
           endTime: scheduled.end,
           type: 'schedule',
           categoryId: sourceTask?.categoryId,
-          reminderEnabled: false,
+          reminderMinutesBefore: null,
         })
         eventCreatedCount += 1
       } catch (error) {
