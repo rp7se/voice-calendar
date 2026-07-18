@@ -7,12 +7,18 @@
 #include <drogon/drogon.h>
 #include <drogon/utils/Utilities.h>
 
+#include <stdexcept>
+
 namespace voicecalendar::services
 {
 
 ReminderService::ReminderService(std::chrono::seconds scanInterval)
     : scanInterval_(scanInterval)
 {
+    if (scanInterval_ < std::chrono::seconds(1))
+    {
+        throw std::invalid_argument("Reminder scan interval must be at least one second");
+    }
 }
 
 ReminderService::~ReminderService()
@@ -34,17 +40,24 @@ void ReminderService::start(trantor::EventLoop* eventLoop)
         [this]() {
             scanSafely();
         });
-    LOG_INFO << "ReminderService started";
+    LOG_INFO << "ReminderService started: scanIntervalSeconds="
+             << scanInterval_.count();
 }
 
 void ReminderService::stop()
 {
+    const auto wasRunning =
+        eventLoop_ != nullptr && timerId_ != trantor::InvalidTimerId;
     if (eventLoop_ != nullptr && timerId_ != trantor::InvalidTimerId)
     {
         eventLoop_->invalidateTimer(timerId_);
     }
     timerId_ = trantor::InvalidTimerId;
     eventLoop_ = nullptr;
+    if (wasRunning)
+    {
+        LOG_INFO << "ReminderService stopped";
+    }
 }
 
 void ReminderService::scanSafely() const noexcept
@@ -96,7 +109,7 @@ void ReminderService::scan(std::chrono::system_clock::time_point now) const
 
         if (repository_.createPending(candidate, delivery))
         {
-            LOG_INFO << "Reminder triggered: eventId=" << candidate.eventId;
+            LOG_DEBUG << "Reminder triggered: eventId=" << candidate.eventId;
             ReminderStreamService::instance().broadcast(delivery);
         }
     }

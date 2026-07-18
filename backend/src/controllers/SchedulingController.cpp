@@ -1,5 +1,6 @@
 #include "controllers/SchedulingController.h"
 
+#include "http/HttpResponseUtils.h"
 #include "models/Scheduling.h"
 #include "utils/DateTimeUtils.h"
 
@@ -13,7 +14,8 @@ namespace voicecalendar::api
 {
 namespace
 {
-using ResponseCallback = std::function<void(const drogon::HttpResponsePtr&)>;
+using http::ResponseCallback;
+using http::sendError;
 
 struct SchedulingRequest
 {
@@ -31,25 +33,6 @@ struct SchedulingRequestParseResult
     std::string errorMessage;
     bool valid{false};
 };
-
-drogon::HttpResponsePtr jsonResponse(Json::Value body, drogon::HttpStatusCode status)
-{
-    auto response = drogon::HttpResponse::newHttpJsonResponse(std::move(body));
-    response->setStatusCode(status);
-    return response;
-}
-
-void sendError(
-    ResponseCallback& callback,
-    drogon::HttpStatusCode status,
-    const std::string& error,
-    const std::string& message)
-{
-    Json::Value body(Json::objectValue);
-    body["error"] = error;
-    body["message"] = message;
-    callback(jsonResponse(std::move(body), status));
-}
 
 std::string trim(std::string value)
 {
@@ -345,18 +328,13 @@ void SchedulingController::preview(
             parsed.request.rangeStartMinutes,
             parsed.request.rangeEndMinutes,
             parsed.request.tasks);
-        callback(jsonResponse(
+        callback(http::jsonResponse(
             schedulingResultToJson(parsed.request, result),
             drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        LOG_ERROR << "Scheduling preview failed: " << error.what();
-        sendError(
-            callback,
-            drogon::k500InternalServerError,
-            "internal_error",
-            "An internal server error occurred");
+        http::sendInternalError(callback, "Scheduling preview failed", error);
     }
 }
 

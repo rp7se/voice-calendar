@@ -1,6 +1,7 @@
 #include "controllers/CategoryController.h"
 
 #include "http/CategoryJson.h"
+#include "http/HttpResponseUtils.h"
 
 #include <drogon/utils/Utilities.h>
 
@@ -13,36 +14,8 @@ namespace voicecalendar::api
 {
 namespace
 {
-using ResponseCallback = std::function<void(const drogon::HttpResponsePtr&)>;
-
-drogon::HttpResponsePtr jsonResponse(Json::Value body, drogon::HttpStatusCode status)
-{
-    auto response = drogon::HttpResponse::newHttpJsonResponse(std::move(body));
-    response->setStatusCode(status);
-    return response;
-}
-
-void sendError(
-    ResponseCallback& callback,
-    drogon::HttpStatusCode status,
-    const std::string& error,
-    const std::string& message)
-{
-    Json::Value body(Json::objectValue);
-    body["error"] = error;
-    body["message"] = message;
-    callback(jsonResponse(std::move(body), status));
-}
-
-void sendInternalError(ResponseCallback& callback, const std::exception& error)
-{
-    LOG_ERROR << "Category API database operation failed: " << error.what();
-    sendError(
-        callback,
-        drogon::k500InternalServerError,
-        "internal_error",
-        "An internal server error occurred");
-}
+using http::ResponseCallback;
+using http::sendError;
 
 void sendNameConflict(ResponseCallback& callback)
 {
@@ -86,11 +59,11 @@ void CategoryController::listCategories(
         {
             body.append(http::categoryToJson(category));
         }
-        callback(jsonResponse(std::move(body), drogon::k200OK));
+        callback(http::jsonResponse(std::move(body), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Category API list failed", error);
     }
 }
 
@@ -107,11 +80,11 @@ void CategoryController::getCategory(
             sendError(callback, drogon::k404NotFound, "category_not_found", "Category not found");
             return;
         }
-        callback(jsonResponse(http::categoryToJson(*category), drogon::k200OK));
+        callback(http::jsonResponse(http::categoryToJson(*category), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Category API get failed", error);
     }
 }
 
@@ -152,11 +125,11 @@ void CategoryController::createCategory(
         parsed.category.createdAt = utcNowIso8601();
         parsed.category.updatedAt = parsed.category.createdAt;
         const auto category = repository_.create(parsed.category);
-        callback(jsonResponse(http::categoryToJson(category), drogon::k201Created));
+        callback(http::jsonResponse(http::categoryToJson(category), drogon::k201Created));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Category API create failed", error);
     }
 }
 
@@ -200,11 +173,11 @@ void CategoryController::updateCategory(
             sendError(callback, drogon::k404NotFound, "category_not_found", "Category not found");
             return;
         }
-        callback(jsonResponse(http::categoryToJson(parsed.category), drogon::k200OK));
+        callback(http::jsonResponse(http::categoryToJson(parsed.category), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Category API update failed", error);
     }
 }
 
@@ -227,7 +200,7 @@ void CategoryController::deleteCategory(
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Category API delete failed", error);
     }
 }
 

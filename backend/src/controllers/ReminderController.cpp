@@ -1,5 +1,6 @@
 #include "controllers/ReminderController.h"
 
+#include "http/HttpResponseUtils.h"
 #include "http/ReminderJson.h"
 #include "services/ReminderStreamService.h"
 
@@ -9,36 +10,8 @@ namespace voicecalendar::api
 {
 namespace
 {
-using ResponseCallback = std::function<void(const drogon::HttpResponsePtr&)>;
-
-drogon::HttpResponsePtr jsonResponse(Json::Value body, drogon::HttpStatusCode status)
-{
-    auto response = drogon::HttpResponse::newHttpJsonResponse(std::move(body));
-    response->setStatusCode(status);
-    return response;
-}
-
-void sendError(
-    ResponseCallback& callback,
-    drogon::HttpStatusCode status,
-    const std::string& error,
-    const std::string& message)
-{
-    Json::Value body(Json::objectValue);
-    body["error"] = error;
-    body["message"] = message;
-    callback(jsonResponse(std::move(body), status));
-}
-
-void sendInternalError(ResponseCallback& callback, const std::exception& error)
-{
-    LOG_ERROR << "Reminder API database operation failed: " << error.what();
-    sendError(
-        callback,
-        drogon::k500InternalServerError,
-        "internal_error",
-        "An internal server error occurred");
-}
+using http::ResponseCallback;
+using http::sendError;
 } // namespace
 
 void ReminderController::listPending(
@@ -52,11 +25,11 @@ void ReminderController::listPending(
         {
             body.append(http::reminderDeliveryToJson(delivery));
         }
-        callback(jsonResponse(std::move(body), drogon::k200OK));
+        callback(http::jsonResponse(std::move(body), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Reminder API list failed", error);
     }
 }
 
@@ -88,11 +61,11 @@ void ReminderController::acknowledge(
         {
             throw std::runtime_error("Reminder disappeared while being acknowledged");
         }
-        callback(jsonResponse(http::reminderDeliveryToJson(*updated), drogon::k200OK));
+        callback(http::jsonResponse(http::reminderDeliveryToJson(*updated), drogon::k200OK));
     }
     catch (const std::exception& error)
     {
-        sendInternalError(callback, error);
+        http::sendInternalError(callback, "Reminder acknowledgement failed", error);
     }
 }
 

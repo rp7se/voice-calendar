@@ -13,6 +13,7 @@ add_executable(voicecalendar_backend)
 target_sources(voicecalendar_backend
   PRIVATE
     src/main.cpp
+    src/config/BackendConfig.cpp
     src/controllers/EventController.cpp
     src/controllers/CategoryController.cpp
     src/controllers/FreeTimeController.cpp
@@ -25,6 +26,7 @@ target_sources(voicecalendar_backend
     src/http/CategoryJson.cpp
     src/http/TaskJson.cpp
     src/http/ReminderJson.cpp
+    src/http/HttpResponseUtils.cpp
     src/models/Event.cpp
     src/models/Category.cpp
     src/models/Task.cpp
@@ -47,6 +49,11 @@ target_include_directories(voicecalendar_backend
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+target_compile_definitions(voicecalendar_backend
+  PRIVATE
+    VOICECALENDAR_BACKEND_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
 target_link_libraries(voicecalendar_backend
   PRIVATE
     Drogon::Drogon
@@ -66,3 +73,20 @@ target_include_directories(reminder_datetime_tests
 )
 
 add_test(NAME reminder_datetime_tests COMMAND reminder_datetime_tests)
+
+add_executable(backend_config_tests
+  tests/BackendConfigTests.cpp
+  src/config/BackendConfig.cpp
+)
+
+target_include_directories(backend_config_tests
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+target_compile_definitions(backend_config_tests
+  PRIVATE
+    VOICECALENDAR_BACKEND_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
+add_test(NAME backend_config_tests COMMAND backend_config_tests)
