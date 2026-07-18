@@ -1,118 +1,215 @@
-# VoiceCalendar Backend
+# VoiceCalendar C++ Backend
 
-VoiceCalendar C++ backend skeleton for PR25.
+VoiceCalendar Backend 是基于 C++17、Drogon 和 SQLite 的本地日程服务，负责 Event、Task、Category、Scheduling 和 Reminder 的持久化与业务规则。
 
-## 技术栈
+## Responsibilities
+
+- Event、Task、Category CRUD
+- Event 时间区间冲突检测
+- Free Time 区间计算
+- 确定性 Task Scheduling Preview
+- Task → Event Scheduling Relation
+- Event Reminder 配置与 Delivery 持久化
+- 后台 ReminderService、SSE 推送与 ACK
+- 集中配置、统一 API Error 和 Drogon/Trantor Logging
+
+## Architecture
+
+Backend 按职责分层：
+
+- `controllers/`：Drogon 路由、输入验证、HTTP Status 和统一错误响应。
+- `services/`：Conflict Detection、Free Time、Task Scheduler、Reminder 扫描与 SSE。
+- `repositories/`：参数化 SQL、查询和事务。
+- `models/`：Event、Task、Category、Scheduling、Reminder 领域模型。
+- `database/`：SQLite Client、Migration 执行和 Schema 校验。
+- `config/`：环境变量加载和启动前验证。
+- `http/`：JSON 解析、序列化和 Response Helper。
+
+## Tech Stack
 
 - C++17
-- CMake
-- Drogon
+- Drogon / Trantor
+- SQLite
+- CMake 3.20+
 - vcpkg Manifest Mode
 - MSVC / Visual Studio 2022 Build Tools
 
-## 当前功能
+## Directory Structure
 
-- 启动本地 HTTP Server
-- 监听 `127.0.0.1:8080`
-- 提供 `GET /api/health`
-- 启动时初始化 SQLite 数据库
-- 自动创建 `events` 表
+```text
+backend/
+├── migrations/       # 版本化 SQLite Migration
+├── src/
+│   ├── config/
+│   ├── controllers/
+│   ├── database/
+│   ├── http/
+│   ├── models/
+│   ├── repositories/
+│   ├── services/
+│   └── utils/
+├── tests/
+├── CMakeLists.txt
+└── vcpkg.json
+```
 
-## 环境要求
+## Build and Run
 
-- Visual Studio 2022 Build Tools
+### Prerequisites
+
+- Visual Studio 2022 Build Tools，包含 C++ Desktop workload
 - CMake
 - vcpkg
 - 已设置 `VCPKG_ROOT`
-- 存在 `$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake`
-
-## CMake 配置
 
 在仓库根目录执行：
 
 ```powershell
 cmake -S backend -B backend/build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+cmake --build backend/build --config Debug
+.\backend\build\Debug\voicecalendar_backend.exe
 ```
 
-依赖由 `backend/vcpkg.json` 声明，CMake configure 阶段会通过 vcpkg manifest mode 安装项目依赖。
+CMake Target 和可执行文件名为 `voicecalendar_backend`；Debug 构建位于 `backend/build/Debug/voicecalendar_backend.exe`。
 
-## Backend 配置
+启动后验证：
 
-Backend 在启动时读取以下环境变量；未设置时使用安全默认值：
+```powershell
+Invoke-RestMethod http://127.0.0.1:8080/api/health
+```
 
-| 环境变量 | 默认值 | 验证规则 |
-| --- | --- | --- |
-| `VOICECALENDAR_HOST` | `127.0.0.1` | 不得为空 |
-| `VOICECALENDAR_PORT` | `8080` | `1`～`65535` 的整数 |
-| `VOICECALENDAR_DB_PATH` | `backend/data/voicecalendar.db` | 不得为空 |
-| `VOICECALENDAR_REMINDER_SCAN_SECONDS` | `30` | 大于等于 `1` 的整数秒数 |
+## Configuration
 
-环境变量优先于默认值。Port 或 Reminder 扫描间隔等配置非法时，Backend 会记录明确错误并拒绝启动，不会静默回退或截断。`VOICECALENDAR_DB_PATH` 使用绝对路径时保持原值；使用相对路径时始终相对于仓库根目录解析，不依赖启动时的 Working Directory。
+| Variable | Purpose | Default | Validation |
+| --- | --- | --- | --- |
+| `VOICECALENDAR_HOST` | HTTP 监听地址 | `127.0.0.1` | 不得为空 |
+| `VOICECALENDAR_PORT` | HTTP 监听端口 | `8080` | `1`–`65535` 的整数 |
+| `VOICECALENDAR_DB_PATH` | SQLite 文件 | `backend/data/voicecalendar.db` | 不得为空；相对路径基于仓库根目录 |
+| `VOICECALENDAR_REMINDER_SCAN_SECONDS` | ReminderService 扫描间隔 | `30` | 至少 `1` 秒的整数 |
+
+非法 Port 或扫描间隔会让 Backend 明确拒绝启动，不会截断或静默回退。默认数据库和相对数据库路径不依赖启动 Working Directory；无法可靠定位 Backend 源码目录时也会拒绝启动，避免意外创建第二个空数据库。
 
 PowerShell 示例：
 
 ```powershell
+$env:VOICECALENDAR_HOST = "127.0.0.1"
 $env:VOICECALENDAR_PORT = "8081"
 $env:VOICECALENDAR_DB_PATH = "backend/data/dev.db"
 $env:VOICECALENDAR_REMINDER_SCAN_SECONDS = "10"
 .\backend\build\Debug\voicecalendar_backend.exe
 ```
 
-测试结束后可移除覆盖：
+测试结束后可清除覆盖：
 
 ```powershell
+Remove-Item Env:VOICECALENDAR_HOST -ErrorAction SilentlyContinue
 Remove-Item Env:VOICECALENDAR_PORT -ErrorAction SilentlyContinue
 Remove-Item Env:VOICECALENDAR_DB_PATH -ErrorAction SilentlyContinue
 Remove-Item Env:VOICECALENDAR_REMINDER_SCAN_SECONDS -ErrorAction SilentlyContinue
 ```
 
-默认数据库路径继续通过项目的 `backend` 源码目录解析；从仓库根目录、`backend` 目录或其他 Working Directory 启动都会打开同一个 `backend/data/voicecalendar.db`。若无法可靠定位源码目录，Backend 会拒绝启动，不会猜测路径并创建第二个默认数据库。数据库文件、WAL 和 SHM 文件不会提交到 Git；`backend/data/.gitkeep` 仅用于保留目录。
+## Database and Migrations
 
-## 编译
+默认数据库为 `backend/data/voicecalendar.db`。Backend 启动时按顺序执行并记录以下 Migration：
 
-```powershell
-cmake --build backend/build --config Debug
-```
+1. `001_create_events.sql`
+2. `002_create_tasks.sql`
+3. `003_create_categories.sql`
+4. `004_add_task_scheduling_relation.sql`
+5. `005_add_event_reminders.sql`
 
-## 启动
+Migration 通过 `schema_migrations` 保证幂等，并在启动后校验 Event、Task、Category、Scheduling Relation 和 Reminder Schema。数据库、WAL、SHM 和 Build 产物均由 `.gitignore` 排除。
 
-```powershell
-.\backend\build\Debug\voicecalendar_backend.exe
-```
-
-## Health API 测试
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8080/api/health
-```
-
-预期返回：
-
-```json
-{
-  "service": "voicecalendar-backend",
-  "status": "ok",
-  "version": "0.1.0"
-}
-```
-
-## Event API
+## API Overview
 
 ```text
+GET    /api/health
+
 GET    /api/events
 GET    /api/events/{id}
 POST   /api/events
 PUT    /api/events/{id}
 DELETE /api/events/{id}
-GET    /api/free-time?date=2026-07-20&start=08:00&end=22:00
+
+GET    /api/tasks
+GET    /api/tasks/{id}
+POST   /api/tasks
+PUT    /api/tasks/{id}
+PUT    /api/tasks/{id}/scheduling
+DELETE /api/tasks/{id}
+
+GET    /api/categories
+GET    /api/categories/{id}
+POST   /api/categories
+PUT    /api/categories/{id}
+DELETE /api/categories/{id}
+
+GET    /api/free-time?date=YYYY-MM-DD&start=HH:mm&end=HH:mm
 POST   /api/scheduling/preview
+
+GET    /api/reminders/pending
+GET    /api/reminders/stream
+POST   /api/reminders/{id}/ack
 ```
 
-`POST` and `PUT` reject overlapping same-day `[startTime, endTime)` ranges with
-HTTP `409` and the machine-readable error code `event_conflict`.
+## API Errors
 
-`GET /api/free-time` returns the free `[start, end)` slots within the requested
-same-day time range, including each slot's `durationMinutes`.
+基础错误结构统一为：
 
-`POST /api/scheduling/preview` returns a deterministic, non-persistent task
-schedule preview. It reads Events but does not create or update them.
+```json
+{
+  "error": "event_not_found",
+  "message": "Event not found"
+}
+```
+
+业务错误保留机器可读 Code 和 HTTP `400/404/409`。系统异常使用 HTTP `500` 与 `internal_error`。`event_conflict` 还会返回 `conflicts` 数组；正常用户输入错误不会全部记录为系统 ERROR。
+
+## Conflict and Free Time
+
+- Event Conflict 使用同日 `[start, end)` 区间判断，因此相邻区间不冲突。
+- 无结束时间的 Event 不占用区间，也不参与区间冲突。
+- Free Time 会将 Event 裁剪到查询范围，排序并合并重叠/相邻忙碌区间，再返回剩余连续空闲区间。
+
+## Auto Scheduling
+
+`POST /api/scheduling/preview` 是非持久化预览。Scheduler：
+
+1. 从现有 Event 计算目标范围内的连续 Free Time。
+2. 跳过已完成或已安排 Task，并标记缺少/非法 Estimated Duration 的任务。
+3. 按 Deadline 是否存在、Deadline 日期/时间、Priority、较长耗时、输入顺序进行稳定排序。
+4. 使用 First Fit 将任务放入最早可完整容纳它的空闲区间。
+
+响应中的 `strategy` 为 `edf_priority_first_fit_v1`。这是确定性贪心策略，不宣称 AI、Machine Learning 或全局最优。
+
+## Reminder System
+
+Reminder 流程：
+
+```text
+Event Reminder Configuration
+  → SQLite event persistence
+  → ReminderService scan
+  → reminder_deliveries persistence (SQLite)
+  → SSE stream
+  → Frontend Toast / TTS
+  → ACK
+```
+
+`ReminderService` 在 Drogon EventLoop 上按配置间隔运行。符合触发条件的 Delivery 先持久化并去重，再通过 SSE 广播。Frontend 关闭时 Backend 仍可继续生成 Delivery；实时 Toast/TTS 需要 Frontend 保持连接。Backend 关闭后不会继续扫描或推送。
+
+Reminder API：
+
+- `GET /api/reminders/pending`：获取未 ACK Delivery。
+- `GET /api/reminders/stream`：建立 SSE，接收 `heartbeat` 与 `reminder` Event。
+- `POST /api/reminders/{id}/ack`：将 Delivery 标记为 acknowledged。
+
+## Validation
+
+```powershell
+cmake --build backend/build --config Debug
+ctest --test-dir backend/build -C Debug --output-on-failure
+node scripts/test-backend-infrastructure.mjs
+```
+
+最后一条命令需从仓库根目录执行，覆盖配置、数据库兼容、API Error、CRUD、Scheduling、Reminder、SSE 与 ACK。

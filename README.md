@@ -1,263 +1,261 @@
 # VoiceCalendar
 
-VoiceCalendar 是一个面向学习、工作和竞赛场景的语音日程管理工具。项目以语音交互为核心，支持用户通过自然语言完成日程添加、查看、删除、总结和分类管理，并结合日历视图、倒计时气泡、分类文件夹、课程表/工作表等功能，提高日历管理的效率和提醒效果。
+VoiceCalendar 是一个支持语音交互、确定性任务排程和实时提醒的现代日程管理系统：前端使用 React + TypeScript + Vite，后端使用 C++17 + Drogon，Event、Task、Category 与 Reminder Delivery 持久化到 SQLite。
 
-## Demo 视频
+## Demo
 
-> Demo 视频链接：【七牛云 Voice-Calendar】https://www.bilibili.com/video/BV1VCVS6PEpf?vd_source=9941f0161c1d3845171dac79a0cf570c
+[观看 VoiceCalendar Demo 视频](https://www.bilibili.com/video/BV1VCVS6PEpf)
 
-## 项目核心功能
+> 该视频是项目既有演示入口；当前仓库的 VoiceCalendar 2.0 在其基础上继续加入了 C++ Backend、Tasks、自动排程和实时 Reminder 等能力。
 
-### 1. 语音交互日程管理
+## Features
 
-本项目不是单纯的语音转文字，而是将语音识别结果进一步解析为日历操作指令。用户可以通过自然语言完成日程管理，系统会在页面中展示执行结果，并通过语音进行反馈。
+- **Today Workspace**：聚合今日事件、任务、时间线和下一项安排。
+- **Calendar Workspace**：月历、日期详情、节日、课程表/工作表时间格子及 Event CRUD。
+- **Tasks Workspace**：Task 创建、编辑、完成、删除、优先级、Deadline 和预计耗时管理。
+- **Categories**：Category CRUD、Event/Task 分类关联和侧边栏筛选；删除分类时保留业务数据并清空关联。
+- **Voice Commands**：基于 Web Speech API 与本地规则解析器完成日程创建、查询、删除、总结、倒计时查询等操作，并通过 TTS 反馈。
+- **Voice Orb 与 Command Palette**：统一语音入口、快捷导航、文本指令以及 Event/Task/Category 搜索。
+- **Conflict Detection**：创建或编辑有结束时间的 Event 时检测同日区间重叠，并返回冲突详情。
+- **Free Time Query**：裁剪并合并忙碌区间，计算指定日期和时间范围内的空闲时段。
+- **Task Auto Scheduling**：根据 Deadline、Priority、Estimated Duration 和可用时间生成可解释的确定性排程预览。
+- **Scheduling Confirmation**：确认预览后创建对应 Event，并保存 Task → Event 排程关系。
+- **Reminder System**：Event 提醒配置、后台扫描、Delivery 持久化、SSE 推送、React Toast、TTS 和 ACK。
+- **Countdown 与 Focus Mode**：本地倒计时、漂浮气泡和专注视图。
 
-支持示例：
-
-* “明天9点提醒我考试”：自动添加日程
-* “6月21号提醒我考试”：自动识别具体日期并添加日程
-* “下周三下午五点提醒我面试”：自动识别周日期和时间
-* “查看明天的日程”：查询指定日期安排
-* “删除明天9点的考试”：删除匹配日程
-* “总结今天的日程”：统计当天事项和预计耗时
-* “总结这周的安排”：汇总未来 7 天日程
-* “距离蓝桥杯还有几天”：查询倒计时
-* “把5月8日拖进学习文件夹”：将指定日期加入分类
-* “现在几点了”：语音播报当前时间
-* “小历小历，明天9点提醒我考试”：开启唤醒词模式后执行日程指令
-
-### 2. 日历月视图
-
-* 展示当前月份日历
-* 支持上个月、下个月切换
-* 高亮今天和当前选中日期
-* 日期格子中显示节日和日程数量
-* 点击日期后打开日期详情弹窗
-
-### 3. 日期详情弹窗
-
-* 点击日期后弹出当天详情
-* 支持查看当天日程、课程、工作和提醒
-* 支持添加和删除当天事项
-* 支持选择事项类型和分类
-* 支持显示当天事项数量和预计耗时
-
-### 4. 课程表 / 工作表时间格子
-
-* 在日期详情弹窗中提供课程表和工作表入口
-* 使用固定时间段网格快速编辑当天安排
-* 每个时间段可输入课程或工作内容
-* 保存后自动生成对应的日程事项
-
-### 5. 节日显示
-
-* 在日历日期格子中显示节日信息
-* 支持元旦、劳动节、儿童节、国庆节、圣诞节等固定节日
-* 农历节日当前采用静态示例或预留说明
-
-### 6. 重要事项倒计时
-
-* 支持创建考试、比赛、面试等重要事项倒计时
-* 显示目标日期和剩余天数
-* 支持删除倒计时
-
-### 7. 倒计时气泡提醒
-
-* 创建倒计时后生成圆形漂浮气泡
-* 气泡在页面空白区域移动提醒用户
-* 点击气泡后语音播报目标和剩余天数
-* 用轻量化的方式持续提醒重要事项
-
-### 8. 目标完成反馈
-
-* 删除倒计时时先询问目标是否完成
-* 如果完成，展示祝贺文案、励志古诗和简短提示音
-* 如果未完成，展示鼓励文案和安慰诗句
-* 使用 Web Audio API 生成简短反馈音，不依赖外部音频资源
-
-### 9. 分类文件夹
-
-* 支持创建学习、比赛、面试、课程、工作等分类
-* 可按分类查看相关日程事项
-* 支持将日期拖拽到分类文件夹
-* 支持通过语音将日期加入分类
-* 分类下可查看已加入日期和对应日程概览
-
-## 技术栈
-
-* React：构建前端用户界面
-* TypeScript：增强类型约束和代码可维护性
-* Vite：提供项目开发与构建环境
-* Web Speech API：实现浏览器语音识别能力
-* speechSynthesis：实现语音播报反馈
-* Web Audio API：生成目标完成反馈提示音
-* localStorage：保存日程、倒计时、分类和日期分类关系
-* HTML5 Drag and Drop：实现日期拖拽到分类文件夹功能
-
-## 第三方依赖说明
-
-本项目主要使用 React、TypeScript 和 Vite 搭建前端工程。语音识别、语音播报、音效反馈、本地存储和拖拽能力均基于浏览器原生 API 实现。
-
-项目未使用第三方日历模板、现成日程管理系统、第三方拖拽库或外部 AI API。
-
-使用到的第三方框架和工具包括：
-
-* React：用于构建页面组件
-* TypeScript：用于类型检查和代码组织
-* Vite：用于开发服务器和项目构建
-
-使用到的浏览器原生能力包括：
-
-* Web Speech API：语音识别
-* speechSynthesis：语音播报
-* Web Audio API：音效反馈
-* localStorage：本地数据持久化
-* HTML5 Drag and Drop：拖拽交互
-
-## 原创功能说明
-
-本项目围绕“语音版日历工具”的题目要求进行设计和实现，核心业务逻辑和交互流程均根据作品需求自行完成。
-
-原创功能包括：
-
-1. 语音日程管理
-   将语音识别结果解析为日程操作指令，支持语音添加、查看、删除日程。
-
-2. 语音日程总结
-   支持通过语音询问今天、明天或未来 7 天安排，系统统计日程数量、预计总耗时和主要事项。
-
-3. 本地规则助手建议
-   当用户添加考试、比赛、面试、纪念日、生日等事项时，系统根据关键词给出本地规则化建议。
-
-4. 倒计时气泡提醒
-   将重要倒计时转化为页面中的圆形漂浮提醒气泡，并支持点击语音播报。
-
-5. 目标完成反馈
-   删除目标时询问完成状态，并根据结果展示不同诗句和提示音反馈。
-
-6. 日期详情弹窗
-   点击日历日期后以弹窗形式管理当天事项，减少页面常驻区域占用。
-
-7. 课程表 / 工作表时间格子
-   使用时间段网格快速创建课程或工作安排。
-
-8. 分类文件夹与日期拖拽
-   支持将日期拖拽或通过语音加入分类文件夹，方便按场景组织重要日期。
-
-9. 节日与日程数量展示
-   在日历格子中同时展示节日标签和当天日程数量，提升信息密度。
-
-## 项目运行方式
-
-### 安装依赖
-
-```bash
-npm install
-```
-
-### 本地启动
-
-```bash
-npm run dev
-```
-
-Event 默认使用 C++ Backend。启动前请先运行 Backend；如需覆盖开发环境配置，
-可复制 `.env.example` 为不提交 Git 的 `.env.local`：
+## Architecture
 
 ```text
-VITE_API_BASE_URL=/api
-VITE_EVENT_DATA_SOURCE=backend
+React + TypeScript Frontend
+        │
+        ├── REST：Event / Task / Category / Scheduling / Reminder API
+        └── SSE：实时 Reminder Stream
+        │
+        ▼
+C++17 + Drogon Backend
+        │
+        ├── Controller：HTTP 路由、请求验证、统一错误响应
+        ├── Service：冲突检测、空闲时间、任务排程、后台提醒
+        └── Repository：参数化 SQL 与事务边界
+        │
+        ▼
+SQLite
 ```
 
-开发服务器会把浏览器的 `/api` 请求代理到 `http://127.0.0.1:8080`。
+Event、Task、Category 和 Reminder Delivery 的运行时数据以 Backend/SQLite 为准。Countdown 和 Category-Date Link 仍保存在浏览器 localStorage；旧版 Event、Task、Category localStorage 数据只用于一次性迁移与备份，不参与 Backend 模式下的双写。
 
-Backend 同时提供 Task CRUD API：
+## Tech Stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | React 19、TypeScript、Vite、CSS |
+| Browser APIs | Web Speech API、SpeechSynthesis、Web Audio API、EventSource、HTML5 Drag and Drop |
+| Backend | C++17、Drogon、Trantor、CMake |
+| Persistence | SQLite、版本化 SQL Migration |
+| Dependencies | npm、vcpkg Manifest Mode |
+
+## Core Backend Capabilities
+
+- Drogon REST API 与 SSE 流式响应。
+- Event、Task、Category、Reminder 的 Controller / Service / Repository 分层。
+- SQLite 持久化、参数化 SQL、事务和启动时 Schema Migration。
+- `[start, end)` 区间冲突检测与冲突 Payload。
+- 忙碌区间裁剪、排序和合并后的 Free Time 计算。
+- C++ 确定性 Task Scheduler。
+- 常驻 Backend EventLoop 上的 ReminderService 与 Delivery 去重持久化。
+- 集中的 BackendConfig、环境变量验证、统一 API Error 和 Drogon/Trantor Logging。
+
+## Auto Scheduling
+
+当前排程器是**可解释的确定性贪心算法**，不是 AI、Machine Learning 或全局最优求解器。
+
+1. Backend 读取目标日期内已有 Event，合并忙碌区间并计算可用时间。
+2. 已完成或已经建立排程关系的 Task 不参与本次安排；缺少或包含非法预计耗时的 Task 会返回明确原因。
+3. 可安排 Task 依次按以下规则稳定排序：
+   - 有 Deadline 的任务优先；
+   - Deadline 日期、时间更早的优先；
+   - Priority 按 High、Medium、Low；
+   - 同条件下预计耗时更长的优先；
+   - 最后保持请求输入顺序。
+4. 每个 Task 使用 First Fit 放入最早能够完整容纳其 Estimated Duration 的连续空闲区间。
+5. `POST /api/scheduling/preview` 只返回预览，不写数据库。用户确认后，Frontend 逐项创建 Event，再调用 Task Scheduling Relation API 保存关联。
+
+## Reminder System
 
 ```text
-GET    /api/tasks
-GET    /api/tasks/:id
-POST   /api/tasks
-PUT    /api/tasks/:id
-DELETE /api/tasks/:id
+Event Reminder Configuration
+        ↓
+SQLite Event Persistence
+        ↓
+C++ ReminderService 定时扫描
+        ↓
+Reminder Delivery Persistence (SQLite)
+        ↓
+SSE /api/reminders/stream
+        ↓
+React Toast + TTS
+        ↓
+POST ACK
 ```
 
-Category 同样由 Backend 提供 CRUD API：
+只要 C++ Backend 仍在运行，ReminderService 就能继续扫描并生成持久化的 Reminder Delivery，即使 React 页面暂时关闭。实时 Toast 和 TTS 依赖 Frontend 页面打开并连接 SSE；Backend 关闭后不会继续生成或推送提醒。
+
+## Project Structure
 
 ```text
-GET    /api/categories
-GET    /api/categories/:id
-POST   /api/categories
-PUT    /api/categories/:id
-DELETE /api/categories/:id
+voice-calendar/
+├── backend/
+│   ├── migrations/          # SQLite Schema Migration
+│   ├── src/
+│   │   ├── config/          # BackendConfig
+│   │   ├── controllers/     # Drogon HTTP Controller
+│   │   ├── database/        # Database 初始化与 Migration
+│   │   ├── http/            # JSON 转换与统一响应
+│   │   ├── models/          # Backend 领域模型
+│   │   ├── repositories/    # SQLite 数据访问
+│   │   ├── services/        # Conflict、Free Time、Scheduler、Reminder
+│   │   └── utils/           # 日期与 Reminder 时间工具
+│   ├── tests/               # Backend 单元测试
+│   ├── CMakeLists.txt
+│   └── vcpkg.json
+├── public/                  # 静态资源
+├── scripts/                 # Migration 与 Backend 集成回归脚本
+├── src/
+│   ├── api/                 # REST / Reminder API Client
+│   ├── components/          # Workspace 与 UI 组件
+│   ├── hooks/               # Speech / Reminder Hooks
+│   ├── migrations/          # Legacy localStorage 迁移
+│   ├── services/            # 数据源与 SSE Client
+│   ├── types/               # TypeScript 模型
+│   └── utils/               # 日期、存储、语音指令等工具
+├── .env.example
+├── package.json
+└── vite.config.ts
 ```
 
-删除 Category 不会删除关联 Event 或 Task；Backend 会在同一 SQLite 事务中将其
-`categoryId` 清空，使数据回到“未分类”状态。
+## Getting Started
 
-启动后在浏览器中打开：
+### Prerequisites
 
-```text
-http://localhost:5173/
+本项目主要在 Windows 环境开发和验证，需要：
+
+- Node.js 与 npm
+- Visual Studio 2022 Build Tools，并安装 Desktop development with C++
+- CMake 3.20 或更高版本
+- vcpkg，并设置 `VCPKG_ROOT`
+
+以下命令均在仓库根目录执行，不需要写入私人绝对路径。
+
+### 1. 安装 Frontend 依赖
+
+```powershell
+npm.cmd install
 ```
 
-### 构建项目
+### 2. 配置 Backend
 
-```bash
-npm run build
+```powershell
+cmake -S backend -B backend/build -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
 ```
 
-## 浏览器说明
+vcpkg 会根据 `backend/vcpkg.json` 安装 Drogon 及 SQLite 支持。
 
-语音识别能力依赖浏览器 Web Speech API。建议使用 Chrome 浏览器进行测试。部分浏览器可能不支持语音识别，此时页面会进行降级提示。
+### 3. 构建 Backend
 
-## 数据存储说明
+```powershell
+cmake --build backend/build --config Debug
+```
 
-默认 local 模式使用浏览器 localStorage 保存数据，包括：
+### 4. 启动 Backend
 
-* 日程事项
-* 倒计时事项
-* 分类文件夹
-* 分类与日期的关联关系
+```powershell
+.\backend\build\Debug\voicecalendar_backend.exe
+```
 
-backend 模式下 Event、Task 与 Category 均通过 C++ API 保存到 SQLite；倒计时和分类日期链接仍保持现有本地存储。
-首次升级时，旧版 `localStorage` Event 会在验证 Backend 可用后安全迁移到 SQLite。
-迁移成功后旧 Event 暂时保留为备份，但运行时只读写 Backend，不会双写。
-旧版 `voice-calendar:tasks` Task 也会通过独立迁移标记安全迁移；迁移成功后旧数据保留为备份，Task 运行时只读写 Backend。
-旧版 `voice-calendar:categories` Category 会保留原 ID 迁移，确保已有 Event/Task 的 `categoryId` 关联继续有效。
-`VITE_EVENT_DATA_SOURCE=local` 仅保留用于开发调试或紧急回退。
+默认监听 `http://127.0.0.1:8080`。可用以下命令确认服务：
 
-## 开发过程说明
+```powershell
+Invoke-RestMethod http://127.0.0.1:8080/api/health
+```
 
-本项目按 Pull Request 持续迭代开发，每个 PR 聚焦一个相对独立的功能点，避免最后一天一次性提交所有代码。
+### 5. 启动 Frontend
 
-主要迭代包括：
+保持 Backend 运行，在另一个终端执行：
 
-* PR1：项目初始化
-* PR2：数据模型与本地存储
-* PR3：基础日历月视图
-* PR4：当日详情页与手动事项管理
-* PR5：节日显示
-* PR6：倒计时卡片
-* PR7：分类文件夹
-* PR8：页面布局与亮色主题优化
-* PR9：倒计时气泡提醒
-* PR10：目标完成反馈
-* PR11：语音识别输入
-* PR12：语音添加、查看、删除日程
-* PR13：语音日程总结与助手建议
-* PR14：日期详情弹窗与课程表 / 工作表时间格子
-* PR15：拖拽日期到分类文件夹
-* PR16：语音唤醒词模式
+```powershell
+npm.cmd run dev
+```
 
-## 后续可优化方向
+打开 `http://localhost:5173/`。Vite 会将 `/api` 代理到默认 Backend。语音识别建议使用支持 Web Speech API 的 Chrome；不支持时页面会显示降级状态。
 
-* 接入更完整的自然语言解析能力
-* 支持农历节日自动计算
-* 支持跨设备同步日程数据
-* 支持更多语音对话场景
-* 支持自定义提醒时间和重复提醒
-* 支持导入 / 导出日历数据
+### 6. 发布构建与检查
 
-## 作品声明
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```
 
-本项目为课程作品，核心业务功能、页面交互和数据结构均围绕“语音版日历工具”主题自行设计实现。第三方框架主要用于前端工程搭建，不包含现成日历系统或现成语音日程管理模板。
+## Backend Configuration
+
+Backend 在启动时读取以下真实支持的环境变量：
+
+| Variable | Purpose | Default | Validation |
+| --- | --- | --- | --- |
+| `VOICECALENDAR_HOST` | HTTP 监听地址 | `127.0.0.1` | 不得为空 |
+| `VOICECALENDAR_PORT` | HTTP 监听端口 | `8080` | `1`–`65535` 的整数 |
+| `VOICECALENDAR_DB_PATH` | SQLite 数据库路径 | `backend/data/voicecalendar.db` | 不得为空；相对路径基于仓库根目录 |
+| `VOICECALENDAR_REMINDER_SCAN_SECONDS` | Reminder 扫描间隔 | `30` | 至少 `1` 秒的整数 |
+
+PowerShell 示例：
+
+```powershell
+$env:VOICECALENDAR_PORT = "8081"
+$env:VOICECALENDAR_DB_PATH = "backend/data/dev.db"
+$env:VOICECALENDAR_REMINDER_SCAN_SECONDS = "10"
+.\backend\build\Debug\voicecalendar_backend.exe
+```
+
+Frontend 可复制 `.env.example` 为不提交 Git 的 `.env.local`：
+
+| Variable | Purpose | Default example |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | Frontend API Base URL | `/api` |
+| `VITE_EVENT_DATA_SOURCE` | Event 数据源；正常运行使用 Backend | `backend` |
+
+## API Overview
+
+| Capability | Method and Path | Notes |
+| --- | --- | --- |
+| Health | `GET /api/health` | 服务状态 |
+| Events | `GET/POST /api/events` | 列表、创建 |
+| Event | `GET/PUT/DELETE /api/events/{id}` | 查询、编辑、删除 |
+| Tasks | `GET/POST /api/tasks` | 列表、创建 |
+| Task | `GET/PUT/DELETE /api/tasks/{id}` | 查询、编辑/完成、删除 |
+| Task Scheduling Relation | `PUT /api/tasks/{id}/scheduling` | 保存 Task → Event 关系 |
+| Categories | `GET/POST /api/categories` | 列表、创建 |
+| Category | `GET/PUT/DELETE /api/categories/{id}` | 查询、编辑、删除 |
+| Free Time | `GET /api/free-time?date=YYYY-MM-DD&start=HH:mm&end=HH:mm` | 指定范围的空闲区间 |
+| Scheduling Preview | `POST /api/scheduling/preview` | 非持久化排程预览 |
+| Pending Reminders | `GET /api/reminders/pending` | 未 ACK Delivery |
+| Reminder ACK | `POST /api/reminders/{id}/ack` | 确认 Reminder |
+| Reminder Stream | `GET /api/reminders/stream` | SSE Reminder 与 Heartbeat |
+
+API 错误响应统一包含 `error` 和 `message`；冲突等业务错误可以包含额外字段，例如 `event_conflict.conflicts`。
+
+## Development Workflow
+
+项目采用 Incremental PR Development：每个 PR 聚焦一个清晰功能或重构，通过小步、可验证的变更持续迭代。提交前应运行相关 Frontend build/lint、Backend build/test 和必要的 API 回归。
+
+## Future Improvements
+
+以下仅为未来方向，当前版本尚未实现：
+
+- Habit-based Prefill
+- AI-assisted Natural Language Understanding
+- Route / Schedule Optimization
+- Cross-device Sync
+- System-level Background Reminder
+
+## License / Notes
+
+本项目为课程与个人作品集项目，核心业务逻辑和交互围绕 VoiceCalendar 自行实现。仓库当前未提供独立 LICENSE 文件；如需复用或分发，请先向项目所有者确认授权范围。
