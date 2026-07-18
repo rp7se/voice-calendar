@@ -39,7 +39,7 @@ std::vector<models::ReminderCandidate> ReminderRepository::findCandidates(
     const std::string& lastDate) const
 {
     const auto result = database::DatabaseManager::instance().client()->execSqlSync(
-        "SELECT id, date, start_time, reminder_minutes_before "
+        "SELECT id, title, date, start_time, reminder_minutes_before "
         "FROM events "
         "WHERE reminder_enabled = 1 "
         "AND reminder_minutes_before IS NOT NULL "
@@ -54,6 +54,7 @@ std::vector<models::ReminderCandidate> ReminderRepository::findCandidates(
     {
         models::ReminderCandidate candidate;
         candidate.eventId = row["id"].as<std::string>();
+        candidate.title = row["title"].as<std::string>();
         candidate.date = row["date"].as<std::string>();
         candidate.startTime = row["start_time"].as<std::string>();
         candidate.reminderMinutesBefore = row["reminder_minutes_before"].as<int>();

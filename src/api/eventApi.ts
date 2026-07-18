@@ -1,4 +1,10 @@
-import type { CalendarEvent, CalendarEventInput, EventType } from '../types/calendar.ts'
+import type {
+  CalendarEvent,
+  CalendarEventInput,
+  EventType,
+  ReminderMinutesBefore,
+} from '../types/calendar.ts'
+import { isValidReminderMinutes } from '../utils/reminder.ts'
 
 const EVENT_TYPES: EventType[] = ['schedule', 'course', 'work', 'reminder']
 const CONFIGURED_API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || '/api'
@@ -15,7 +21,7 @@ export type BackendEventDto = {
   type: EventType
   categoryId?: string
   reminderEnabled: boolean
-  reminderMinutesBefore: number | null
+  reminderMinutesBefore: ReminderMinutesBefore
   createdAt: string
   updatedAt: string
 }
@@ -29,7 +35,7 @@ export type EventWriteRequest = {
   type: EventType
   categoryId?: string
   reminderEnabled: boolean
-  reminderMinutesBefore: number | null
+  reminderMinutesBefore: ReminderMinutesBefore
 }
 
 type ApiErrorBody = {
@@ -98,7 +104,7 @@ function parseBackendEvent(value: unknown): BackendEventDto {
       ? value.reminderEnabled
         ? 0
         : null
-      : (value.reminderMinutesBefore as number | null)
+      : (value.reminderMinutesBefore as ReminderMinutesBefore)
   if (value.reminderEnabled !== (reminderMinutesBefore !== null)) {
     throw new ApiError(502, '日程服务返回了不一致的提醒配置。', 'invalid_response')
   }
@@ -124,6 +130,10 @@ function toCalendarEvent(dto: BackendEventDto): CalendarEvent {
 }
 
 export function toEventWriteRequest(event: CalendarEventInput): EventWriteRequest {
+  if (!isValidReminderMinutes(event.reminderMinutesBefore)) {
+    throw new ApiError(400, '提醒时间必须为空或 0 到 10080 之间的整数分钟。', 'invalid_reminder')
+  }
+
   return {
     title: event.title,
     description: event.description,
@@ -132,10 +142,8 @@ export function toEventWriteRequest(event: CalendarEventInput): EventWriteReques
     endTime: event.endTime,
     type: event.type,
     categoryId: event.categoryId,
-    reminderEnabled: event.reminderEnabled,
-    reminderMinutesBefore: event.reminderEnabled
-      ? (event.reminderMinutesBefore ?? 0)
-      : null,
+    reminderEnabled: event.reminderMinutesBefore !== null,
+    reminderMinutesBefore: event.reminderMinutesBefore,
   }
 }
 

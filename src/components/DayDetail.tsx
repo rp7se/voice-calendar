@@ -1,11 +1,21 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import type { CalendarEvent, EventCategory, EventType } from '../types/calendar.ts'
+import type {
+  CalendarEvent,
+  EventCategory,
+  EventType,
+  ReminderMinutesBefore,
+} from '../types/calendar.ts'
 import {
   createEvent,
   deleteEvent,
   getEventErrorMessage,
   getEventsByDate,
 } from '../services/eventDataSource.ts'
+import {
+  formatReminderLabel,
+  parseReminderSelectValue,
+  REMINDER_OPTIONS,
+} from '../utils/reminder.ts'
 
 type DayDetailProps = {
   selectedDate: string
@@ -28,14 +38,24 @@ const TYPE_OPTIONS: { value: EventType; label: string }[] = [
   { value: 'reminder', label: '提醒' },
 ]
 
-const EMPTY_FORM = {
+type EventFormState = {
+  title: string
+  description: string
+  startTime: string
+  endTime: string
+  type: EventType
+  categoryId: string
+  reminderMinutesBefore: ReminderMinutesBefore
+}
+
+const EMPTY_FORM: EventFormState = {
   title: '',
   description: '',
   startTime: '',
   endTime: '',
   type: 'schedule' as EventType,
   categoryId: '',
-  reminderEnabled: false,
+  reminderMinutesBefore: null,
 }
 
 function parseTimeToMinutes(time: string): number {
@@ -112,7 +132,7 @@ export default function DayDetail({
         endTime: form.endTime || undefined,
         type: form.type,
         categoryId: form.categoryId || undefined,
-        reminderEnabled: form.reminderEnabled,
+        reminderMinutesBefore: form.reminderMinutesBefore,
       })
       setForm(EMPTY_FORM)
       refreshEvents()
@@ -239,16 +259,25 @@ export default function DayDetail({
             </select>
           )}
         </div>
-        <label className="form-checkbox">
-          <input
-            type="checkbox"
-            checked={form.reminderEnabled}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, reminderEnabled: e.target.checked }))
+        <div className="form-row">
+          <label htmlFor="event-reminder">提醒</label>
+          <select
+            id="event-reminder"
+            value={form.reminderMinutesBefore ?? ''}
+            onChange={(event) =>
+              setForm((prev) => ({
+                ...prev,
+                reminderMinutesBefore: parseReminderSelectValue(event.target.value),
+              }))
             }
-          />
-          开启提醒
-        </label>
+          >
+            {REMINDER_OPTIONS.map((option) => (
+              <option key={option.value ?? 'none'} value={option.value ?? ''}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
         {operationError && (
           <p className="event-operation-error" role="alert">
             {operationError}
@@ -278,8 +307,10 @@ export default function DayDetail({
                       {item.description && (
                         <p className="event-card-desc">{item.description}</p>
                       )}
-                      {item.reminderEnabled && (
-                        <span className="event-card-badge">提醒已开启</span>
+                      {item.reminderMinutesBefore !== null && (
+                        <span className="event-card-badge">
+                          提醒：{formatReminderLabel(item.reminderMinutesBefore)}
+                        </span>
                       )}
                     </div>
                     <button

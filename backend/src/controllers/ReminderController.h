@@ -16,6 +16,10 @@ public:
         "/api/reminders/pending",
         drogon::Get);
     ADD_METHOD_TO(
+        ReminderController::stream,
+        "/api/reminders/stream",
+        drogon::Get);
+    ADD_METHOD_TO(
         ReminderController::acknowledge,
         "/api/reminders/{id}/ack",
         drogon::Post);
@@ -29,6 +33,10 @@ public:
         const drogon::HttpRequestPtr& request,
         std::function<void(const drogon::HttpResponsePtr&)>&& callback,
         std::string id) const;
+
+    void stream(
+        const drogon::HttpRequestPtr& request,
+        std::function<void(const drogon::HttpResponsePtr&)>&& callback) const;
 
 private:
     repositories::ReminderRepository repository_;

@@ -1,6 +1,7 @@
 #include "controllers/ReminderController.h"
 
 #include "http/ReminderJson.h"
+#include "services/ReminderStreamService.h"
 
 #include <stdexcept>
 
@@ -93,6 +94,24 @@ void ReminderController::acknowledge(
     {
         sendInternalError(callback, error);
     }
+}
+
+void ReminderController::stream(
+    const drogon::HttpRequestPtr&,
+    ResponseCallback&& callback) const
+{
+    auto response = drogon::HttpResponse::newAsyncStreamResponse(
+        [](drogon::ResponseStreamPtr stream) {
+            services::ReminderStreamService::instance().addClient(std::move(stream));
+        },
+        true);
+    response->setContentTypeCodeAndCustomString(
+        drogon::CT_CUSTOM,
+        "text/event-stream; charset=utf-8");
+    response->addHeader("Cache-Control", "no-cache, no-transform");
+    response->addHeader("Connection", "keep-alive");
+    response->addHeader("X-Accel-Buffering", "no");
+    callback(response);
 }
 
 } // namespace voicecalendar::api

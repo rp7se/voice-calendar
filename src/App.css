@@ -4365,3 +4365,95 @@
   color: inherit;
   cursor: pointer;
 }
+
+.reminder-toast {
+  position: fixed;
+  z-index: var(--z-floating);
+  left: max(var(--space-6), env(safe-area-inset-left));
+  bottom: max(var(--space-6), env(safe-area-inset-bottom));
+  display: grid;
+  width: min(380px, calc(100vw - 2 * var(--space-6)));
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid rgba(214, 179, 109, 0.32);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(145deg, rgba(18, 20, 25, 0.96), rgba(5, 7, 11, 0.96)),
+    var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(18px);
+  animation: reminder-toast-enter var(--duration-slow) var(--ease-emphasized);
+}
+
+.reminder-toast-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.reminder-toast-heading span,
+.reminder-toast-heading small {
+  color: var(--color-warning);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.reminder-toast strong {
+  color: var(--color-text-primary);
+  font-size: 17px;
+}
+
+.reminder-toast p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.reminder-toast .reminder-toast-error {
+  color: var(--color-danger-ink);
+}
+
+.reminder-toast button {
+  min-height: 38px;
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  color: var(--color-warning-ink);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.reminder-toast button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+@keyframes reminder-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 680px) {
+  .reminder-toast {
+    right: var(--space-3);
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    left: var(--space-3);
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reminder-toast {
+    animation: none;
+  }
+}

@@ -1,6 +1,7 @@
 #include "services/ReminderService.h"
 
 #include "models/Reminder.h"
+#include "services/ReminderStreamService.h"
 #include "utils/ReminderDateTime.h"
 
 #include <drogon/drogon.h>
@@ -86,6 +87,9 @@ void ReminderService::scan(std::chrono::system_clock::time_point now) const
         models::ReminderDelivery delivery;
         delivery.id = drogon::utils::getUuid();
         delivery.eventId = candidate.eventId;
+        delivery.title = candidate.title;
+        delivery.date = candidate.date;
+        delivery.startTime = candidate.startTime;
         delivery.scheduledFor = utils::formatLocalDateTime(timing->scheduledFor);
         delivery.triggeredAt = utils::formatUtcDateTime(now);
         delivery.createdAt = delivery.triggeredAt;
@@ -93,6 +97,7 @@ void ReminderService::scan(std::chrono::system_clock::time_point now) const
         if (repository_.createPending(candidate, delivery))
         {
             LOG_INFO << "Reminder triggered: eventId=" << candidate.eventId;
+            ReminderStreamService::instance().broadcast(delivery);
         }
     }
 }

@@ -88,6 +88,7 @@ function parseLegacyEvent(value: unknown): CalendarEventInput | null {
   const startTime = value.startTime
   const endTime = value.endTime
   const categoryId = value.categoryId
+  const reminderMinutesBefore = value.reminderMinutesBefore
 
   if (
     !title ||
@@ -118,6 +119,23 @@ function parseLegacyEvent(value: unknown): CalendarEventInput | null {
     return null
   }
 
+  if (
+    reminderMinutesBefore !== undefined &&
+    reminderMinutesBefore !== null &&
+    (!Number.isInteger(reminderMinutesBefore) ||
+      (reminderMinutesBefore as number) < 0 ||
+      (reminderMinutesBefore as number) > 10080)
+  ) {
+    return null
+  }
+
+  const normalizedReminderMinutes =
+    reminderMinutesBefore === undefined
+      ? value.reminderEnabled
+        ? 0
+        : null
+      : (reminderMinutesBefore as number | null)
+
   return {
     title,
     description,
@@ -126,7 +144,7 @@ function parseLegacyEvent(value: unknown): CalendarEventInput | null {
     endTime: typeof endTime === 'string' ? endTime : undefined,
     type: value.type,
     categoryId: typeof categoryId === 'string' ? categoryId : undefined,
-    reminderEnabled: value.reminderEnabled,
+    reminderMinutesBefore: normalizedReminderMinutes,
   }
 }
 
@@ -209,7 +227,7 @@ function eventFingerprint(event: CalendarEventInput): string {
     request.endTime ?? null,
     request.type,
     request.categoryId ?? null,
-    request.reminderEnabled,
+    request.reminderMinutesBefore,
   ])
 }
 

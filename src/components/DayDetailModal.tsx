@@ -5,6 +5,7 @@ import type {
   CalendarEventInput,
   EventCategory,
   EventType,
+  ReminderMinutesBefore,
 } from '../types/calendar.ts'
 import {
   createEvent,
@@ -13,6 +14,11 @@ import {
   getEventsByDate,
   updateEvent,
 } from '../services/eventDataSource.ts'
+import {
+  formatReminderLabel,
+  parseReminderSelectValue,
+  REMINDER_OPTIONS,
+} from '../utils/reminder.ts'
 
 type DayDetailModalProps = {
   selectedDate: string
@@ -36,14 +42,24 @@ const TYPE_LABELS: Record<EventType, string> = {
   reminder: '提醒',
 }
 
-const EMPTY_FORM = {
+type EventFormState = {
+  title: string
+  description: string
+  startTime: string
+  endTime: string
+  type: EventType
+  categoryId: string
+  reminderMinutesBefore: ReminderMinutesBefore
+}
+
+const EMPTY_FORM: EventFormState = {
   title: '',
   description: '',
   startTime: '',
   endTime: '',
   type: 'schedule' as EventType,
   categoryId: '',
-  reminderEnabled: false,
+  reminderMinutesBefore: null,
 }
 
 function sortEventsByTime(events: CalendarEvent[]): CalendarEvent[] {
@@ -95,7 +111,7 @@ export default function DayDetailModal({
       endTime: form.endTime || undefined,
       type: form.type,
       categoryId: form.categoryId || undefined,
-      reminderEnabled: form.reminderEnabled,
+      reminderMinutesBefore: form.reminderMinutesBefore,
     }
 
     setIsSaving(true)
@@ -148,7 +164,7 @@ export default function DayDetailModal({
       endTime: event.endTime ?? '',
       type: event.type,
       categoryId: event.categoryId ?? '',
-      reminderEnabled: event.reminderEnabled,
+      reminderMinutesBefore: event.reminderMinutesBefore,
     })
   }
 
@@ -200,6 +216,9 @@ export default function DayDetailModal({
                         {item.endTime ? ` - ${item.endTime}` : ''} · {TYPE_LABELS[item.type]}
                       </span>
                       {item.description && <p>{item.description}</p>}
+                      {item.reminderMinutesBefore !== null && (
+                        <span>提醒：{formatReminderLabel(item.reminderMinutesBefore)}</span>
+                      )}
                     </div>
                     <div className="day-detail-modal-event-actions">
                       <button type="button" onClick={() => handleEdit(item)}>
@@ -312,19 +331,25 @@ export default function DayDetailModal({
                   </select>
                 )}
               </div>
-              <label className="form-checkbox day-detail-modal-reminder">
-                <input
-                  type="checkbox"
-                  checked={form.reminderEnabled}
+              <div className="form-row">
+                <label htmlFor="modal-event-reminder">提醒</label>
+                <select
+                  id="modal-event-reminder"
+                  value={form.reminderMinutesBefore ?? ''}
                   onChange={(event) =>
                     setForm((prev) => ({
                       ...prev,
-                      reminderEnabled: event.target.checked,
+                      reminderMinutesBefore: parseReminderSelectValue(event.target.value),
                     }))
                   }
-                />
-                开启提醒
-              </label>
+                >
+                  {REMINDER_OPTIONS.map((option) => (
+                    <option key={option.value ?? 'none'} value={option.value ?? ''}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             {operationError && (
               <p className="event-operation-error" role="alert">

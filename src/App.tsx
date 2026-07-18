@@ -19,7 +19,9 @@ import FocusMode from './components/focus/FocusMode.tsx'
 import VoiceControl, {
   type VoiceExternalCommand,
   type VoiceRuntimeStatus,
+  type VoiceSpeechRequest,
 } from './components/VoiceControl.tsx'
+import ReminderToast from './components/ReminderToast.tsx'
 import AppShell from './components/layout/AppShell.tsx'
 import ContextPanel from './components/layout/ContextPanel.tsx'
 import Sidebar, { type WorkspaceId } from './components/layout/Sidebar.tsx'
@@ -46,6 +48,7 @@ import {
 import { deleteCategoryDateLinks } from './utils/storage.ts'
 import type { EventCategory, EventCategoryInput } from './types/calendar.ts'
 import type { Task, TaskInput } from './types/task.ts'
+import { useReminders } from './hooks/useReminders.ts'
 import './App.css'
 
 const WORKSPACE_PLACEHOLDERS: Record<
@@ -81,6 +84,7 @@ type CategoryLoadStatus = 'ready' | 'loading' | 'error'
 const EVENT_LOADING_MESSAGE = '正在检查并迁移旧日程...'
 
 function App() {
+  const reminders = useReminders()
   const [selectedDate, setSelectedDate] = useState(() => formatDate(new Date()))
   const [, setEventsVersion] = useState(0)
   const [, setCategoryLinksVersion] = useState(0)
@@ -109,6 +113,13 @@ function App() {
 
   const selectedCategory =
     categories.find((category) => category.id === selectedCategoryId) ?? null
+
+  const reminderSpeechRequest: VoiceSpeechRequest | null = reminders.activeReminder
+    ? {
+        id: reminders.activeReminder.id,
+        text: `日程提醒，${reminders.activeReminder.title}将在${reminders.activeReminder.startTime}开始。`,
+      }
+    : null
 
   const handleSelectDate = (date: Date) => {
     setSelectedDate(formatDate(date))
@@ -499,6 +510,7 @@ function App() {
                 listenSignal={voiceListenSignal}
                 textCommand={voiceTextCommand}
                 onRuntimeChange={setVoiceStatus}
+                speechRequest={reminderSpeechRequest}
               />
               <CountdownPanel
                 onCountdownChange={handleCountdownChange}
@@ -542,6 +554,16 @@ function App() {
           onToggleListening={handleToggleVoiceInput}
           isHidden={isDayDetailOpen || isCommandPaletteOpen || isFocusMode}
         />
+
+        {reminders.activeReminder && (
+          <ReminderToast
+            reminder={reminders.activeReminder}
+            pendingCount={reminders.pendingCount}
+            isAcknowledging={reminders.isAcknowledging}
+            errorMessage={reminders.ackError}
+            onAcknowledge={() => void reminders.acknowledgeActive()}
+          />
+        )}
 
         {isFocusMode && (
           <FocusMode

@@ -75,7 +75,7 @@ export default function TimeBlockPlanner({
           startTime: block.startTime,
           endTime: block.endTime,
           type: mode as EventType,
-          reminderEnabled: false,
+          reminderMinutesBefore: null,
         })
         savedCount += 1
       }

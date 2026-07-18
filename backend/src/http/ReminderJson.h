@@ -8,5 +8,6 @@ namespace voicecalendar::http
 {
 
 Json::Value reminderDeliveryToJson(const models::ReminderDelivery& delivery);
+Json::Value reminderDeliveryToStreamJson(const models::ReminderDelivery& delivery);
 
 } // namespace voicecalendar::http
